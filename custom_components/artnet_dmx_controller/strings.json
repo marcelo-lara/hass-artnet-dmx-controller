@@ -1,0 +1,21 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configure ArtNet DMX Controller",
+        "description": "Enter the target IP address and Universe for your Art-Net device.",
+        "data": {
+          "target_ip": "Target IP Address",
+          "universe": "Universe (0-32767)"
+        }
+      }
+    },
+    "error": {
+      "invalid_ip": "Invalid IP address",
+      "invalid_universe": "Universe must be between 0 and 32767"
+    },
+    "abort": {
+      "already_configured": "Device is already configured"
+    }
+  }
+}
