@@ -18,6 +18,7 @@ Build a lightweight Home Assistant DMX scene creator focused on scene capture/ap
 - Setup flow cannot complete without both `fixture_type` and `start_channel`.
 - Channel/entity definitions are loaded from `fixture_mapping.json` for the selected model.
 - Adding a new fixture model requires only updating `fixture_mapping.json` (no per-model hardcoded channel definitions in setup logic).
+- Channels marked `hidden_by_default: true` are created disabled/hidden in HA UI (initially `reset` and `program`).
 
 ### Distinct Fixtures Extracted from `docs/fixtures.json`
 
@@ -33,6 +34,115 @@ Build a lightweight Home Assistant DMX scene creator focused on scene capture/ap
   - `moving_head` for moving fixtures (`mini_beam_prism`, `head_el150`)
   - `parcan` for RGB wash fixtures (`parcan`, `proton`)
 - Use `fixture_specie` to drive default entity creation and channel behavior interpretation later (position channels, wheel channels, RGB channels, etc.).
+
+## Implementation Plan (VSCode Copilot / GPT-5-mini Friendly)
+
+### Phase 0 — Baseline + Scope Lock
+- Confirm `fixture_mapping.json` is the single source of truth.
+- Freeze mapping schema fields:
+  - `fixture_specie`
+  - `channel_count`
+  - `channels[].name`
+  - `channels[].offset`
+  - `channels[].description`
+  - `channels[].value_map` (optional)
+- Document fixture type normalization rules.
+- Test:
+  - Manual schema review with `mini_beam_prism` and `parcan`.
+- Exit criteria:
+  - Mapping spec documented in `docs/`.
+
+### Phase 1 — Mapping Loader + Validation
+- Add `fixture_mapping.py` loader in `custom_components/artnet_dmx_controller/`.
+- Load and validate JSON strictly with clear, actionable errors.
+- Cache parsed mapping in integration runtime.
+- Tests:
+  - Valid mapping loads.
+  - Missing file fails with clear error.
+  - Malformed JSON fails with clear error.
+  - Missing required keys fails with clear error.
+- Exit criteria:
+  - Loader returns validated structure and all error paths are handled.
+
+### Phase 2 — Config Flow Inputs for Fixture Creation
+- Extend config flow to request:
+  - `fixture_type`
+  - `start_channel`
+  - optional `name`
+- Populate fixture types from mapping (no hardcoded list).
+- Validate:
+  - DMX bounds (`start + channel_count - 1 <= 512`)
+  - Channel overlap against existing fixtures
+- Tests:
+  - Happy path fixture creation.
+  - Invalid channel rejected.
+  - Overlap rejected.
+  - Unknown fixture type rejected.
+- Exit criteria:
+  - Setup cannot complete without `fixture_type` and `start_channel`.
+
+### Phase 3 — Device + Entity Modeling
+- Implement one HA device per fixture instance.
+- Create child entities from mapped channels.
+- For channels with `value_map` (color/gobo), expose discrete selectable options.
+- For channels with `hidden_by_default: true`, create entities as disabled by default in entity registry.
+- Tests:
+  - `mini_beam_prism` creates expected entities.
+  - `head_el150` wheel channels expose discrete options.
+  - `parcan` and `proton` map expected RGB/strobe/program channels.
+  - `reset` and `program` entities are hidden by default in HA UI.
+- Exit criteria:
+  - Device/entity structure matches product definition.
+
+### Phase 4 — DMX Runtime Write Path
+- Map entity updates to absolute DMX channels using `start_channel + offset - 1`.
+- Keep all offset/value transformation in one central module.
+- Enforce value range guards (`0..255`).
+- Tests:
+  - Manual DMX verification for dimmer, RGB, color wheel, gobo wheel.
+  - Confirm expected channel/value pairs are emitted.
+- Exit criteria:
+  - DMX output is consistent with mapping and fixture config.
+
+### Phase 5 — Persistence + Restart Reliability
+- Persist fixture instances in Config Entries (and integration storage only if required).
+- Recreate devices/entities after restart without duplication.
+- Ensure stable unique IDs per fixture + channel entity.
+- Tests:
+  - Create fixtures, restart HA, confirm recovery and no duplicates.
+- Exit criteria:
+  - Fixtures survive restart with stable IDs and state path.
+
+### Phase 6 — Manual Publish Pipeline (No CI)
+- Use release branch strategy:
+  - `release/v0.x`
+- Publish prerelease tags first:
+  - `v0.x.0-beta.1`, `v0.x.0-beta.2`, ...
+- Promote to stable tag:
+  - `v0.x.0`
+- Maintain:
+  - `CHANGELOG.md` with install/upgrade notes.
+  - `README.md` section: "Try from GitHub".
+- Tests (manual on clean HA instance):
+  - Install from GitHub tag (HACS custom repo or manual copy).
+  - Configure one moving head + one parcan fixture.
+  - Run smoke checklist.
+- Exit criteria:
+  - Reproducible install and first fixture setup in <15 minutes.
+
+### Phase 7 — Publish + Feedback Loop
+- Release beta notes with known limitations.
+- Collect tester feedback via GitHub issues template.
+- Patch quickly on release branch and retag beta if needed.
+- Promote to stable only after repeated passing smoke runs and no blockers.
+- Exit criteria:
+  - Stable release with no open blocker issues.
+
+### Copilot Execution Rules
+- Keep one phase per PR.
+- Do not mix feature work with refactors in same PR.
+- Add/update `TESTING.md` manual checklist each phase.
+- Use short phase prompts with deterministic acceptance criteria.
 
 ### Phase 1
 - Capture current fixture/channel states into a named scene

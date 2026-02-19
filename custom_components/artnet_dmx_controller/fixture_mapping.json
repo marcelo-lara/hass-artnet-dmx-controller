@@ -60,7 +60,12 @@
         },
         { "name": "prism", "offset": 10, "description": "Prism on/rotate" },
         { "name": "autoplay", "offset": 11, "description": "Auto/sound program select" },
-        { "name": "reset", "offset": 12, "description": "Fixture reset trigger" }
+        {
+          "name": "reset",
+          "offset": 12,
+          "description": "Fixture reset trigger",
+          "hidden_by_default": true
+        }
       ]
     },
     "head_el150": {
@@ -129,7 +134,12 @@
         { "name": "green", "offset": 3, "description": "Green intensity" },
         { "name": "blue", "offset": 4, "description": "Blue intensity" },
         { "name": "strobe", "offset": 5, "description": "Strobe speed" },
-        { "name": "program", "offset": 6, "description": "Built-in program selection" }
+        {
+          "name": "program",
+          "offset": 6,
+          "description": "Built-in program selection",
+          "hidden_by_default": true
+        }
       ]
     }
   }
