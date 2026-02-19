@@ -1,46 +1,102 @@
-# Notice
+# ArtNet DMX Controller
 
-The component and platforms in this repository are not meant to be used by a
-user, but as a "blueprint" that custom component developers can build
-upon, to make more awesome stuff.
+[![GitHub Release][releases-shield]][releases]
+[![License][license-shield]](LICENSE)
 
-HAVE FUN! 😎
+A Home Assistant custom integration for controlling DMX devices via the Art-Net protocol.
 
-## Why?
+## Features
 
-This is simple, by having custom_components look (README + structure) the same
-it is easier for developers to help each other and for users to start using them.
+- **Local Push Communication**: Uses UDP sockets for direct Art-Net communication
+- **No External Dependencies**: Built using only Python's built-in socket and struct modules
+- **Full Asyncio Support**: All operations are async-compatible
+- **UI Configuration**: Easy setup through Home Assistant's UI
+- **DMX Light Entities**: Control DMX channels as Home Assistant light entities with brightness control
 
-If you are a developer and you want to add things to this "blueprint" that you think more
-developers will have use for, please open a PR to add it :)
+## Installation
 
-## What?
+### HACS (Recommended)
 
-This repository contains multiple files, here is a overview:
+1. Add this repository as a custom repository in HACS
+2. Search for "ArtNet DMX Controller" in HACS
+3. Click Install
+4. Restart Home Assistant
 
-File | Purpose | Documentation
--- | -- | --
-`.devcontainer.json` | Used for development/testing with Visual Studio Code. | [Documentation](https://code.visualstudio.com/docs/remote/containers)
-`.github/ISSUE_TEMPLATE/*.yml` | Templates for the issue tracker | [Documentation](https://help.github.com/en/github/building-a-strong-community/configuring-issue-templates-for-your-repository)
-`custom_components/integration_blueprint/*` | Integration files, this is where everything happens. | [Documentation](https://developers.home-assistant.io/docs/creating_component_index)
-`CONTRIBUTING.md` | Guidelines on how to contribute. | [Documentation](https://help.github.com/en/github/building-a-strong-community/setting-guidelines-for-repository-contributors)
-`LICENSE` | The license file for the project. | [Documentation](https://help.github.com/en/github/creating-cloning-and-archiving-repositories/licensing-a-repository)
-`README.md` | The file you are reading now, should contain info about the integration, installation and configuration instructions. | [Documentation](https://help.github.com/en/github/writing-on-github/basic-writing-and-formatting-syntax)
-`requirements.txt` | Python packages used for development/lint/testing this integration. | [Documentation](https://pip.pypa.io/en/stable/user_guide/#requirements-files)
+### Manual Installation
 
-## How?
+1. Copy the `custom_components/artnet_dmx_controller` directory to your Home Assistant's `custom_components` directory
+2. Restart Home Assistant
 
-1. Create a new repository in GitHub, using this repository as a template by clicking the "Use this template" button in the GitHub UI.
-1. Open your new repository in Visual Studio Code devcontainer (Preferably with the "`Dev Containers: Clone Repository in Named Container Volume...`" option).
-1. Rename all instances of the `integration_blueprint` to `custom_components/<your_integration_domain>` (e.g. `custom_components/awesome_integration`).
-1. Rename all instances of the `Integration Blueprint` to `<Your Integration Name>` (e.g. `Awesome Integration`).
-1. Run the `scripts/develop` to start HA and test out your new integration.
+## Configuration
 
-## Next steps
+1. Go to Settings → Devices & Services
+2. Click "+ Add Integration"
+3. Search for "ArtNet DMX Controller"
+4. Enter the configuration:
+   - **Target IP Address**: The IP address of your Art-Net device
+   - **Universe**: The Art-Net universe number (0-32767)
 
-These are some next steps you may want to look into:
-- Add tests to your integration, [`pytest-homeassistant-custom-component`](https://github.com/MatthewFlamm/pytest-homeassistant-custom-component) can help you get started.
-- Add brand images (logo/icon) to https://github.com/home-assistant/brands.
-- Create your first release.
-- Share your integration on the [Home Assistant Forum](https://community.home-assistant.io/).
-- Submit your integration to [HACS](https://hacs.xyz/docs/publish/start).
+## Usage
+
+After configuration, the integration will create 10 light entities (DMX channels 1-10) that you can control through Home Assistant:
+
+- **Turn On/Off**: Control individual DMX channels
+- **Brightness**: Set DMX values from 0-255
+
+Example entity names:
+- `light.dmx_channel_1`
+- `light.dmx_channel_2`
+- etc.
+
+## Art-Net Protocol Details
+
+This integration implements the Art-Net protocol for DMX lighting control:
+
+- **Protocol Version**: Art-Net 14
+- **OpCode**: OpOutput (0x5000)
+- **Port**: 6454 (standard Art-Net port)
+- **Packet Structure**: Manually constructed using Python's struct module
+- **DMX Channels**: 512 channels per universe
+
+## Technical Details
+
+### Components
+
+- **manifest.json**: Integration metadata (version 1.0.0, iot_class: local_push)
+- **const.py**: Shared constants (DOMAIN, DEFAULT_PORT: 6454)
+- **artnet.py**: Art-Net packet construction and UDP communication helper
+- **__init__.py**: Integration setup and UDP socket initialization
+- **light.py**: DMX channel light platform
+- **config_flow.py**: UI configuration flow
+
+### Art-Net Packet Structure
+
+The integration constructs Art-Net DMX packets with the following structure:
+
+```
+Header:    "Art-Net\x00" (8 bytes)
+OpCode:    0x5000 (2 bytes, little-endian)
+ProtVer:   14 (2 bytes, big-endian)
+Sequence:  0 (1 byte)
+Physical:  0 (1 byte)
+SubUni:    subnet + universe (1 byte)
+Net:       0 (1 byte)
+Length:    512 (2 bytes, big-endian)
+Data:      DMX data (512 bytes)
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Support
+
+If you encounter any issues or have questions, please [open an issue](https://github.com/marcelo-lara/hass-artnet-dmx-controller/issues).
+
+[releases-shield]: https://img.shields.io/github/release/marcelo-lara/hass-artnet-dmx-controller.svg?style=for-the-badge
+[releases]: https://github.com/marcelo-lara/hass-artnet-dmx-controller/releases
+[license-shield]: https://img.shields.io/github/license/marcelo-lara/hass-artnet-dmx-controller.svg?style=for-the-badge
