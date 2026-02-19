@@ -10,7 +10,7 @@ from homeassistant.components.light import (
     LightEntity,
 )
 
-from .const import DOMAIN, LOGGER
+from .const import DEFAULT_CHANNEL_COUNT, DOMAIN, LOGGER
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -28,14 +28,14 @@ async def async_setup_entry(
     """Set up ArtNet DMX light entities from a config entry."""
     artnet_helper: ArtNetDMXHelper = hass.data[DOMAIN][entry.entry_id]
 
-    # Create light entities for DMX channels 1-10 (can be extended)
+    # Create light entities for DMX channels
     entities = [
         ArtNetDMXLight(
             artnet_helper=artnet_helper,
             channel=channel,
             entry_id=entry.entry_id,
         )
-        for channel in range(1, 11)  # Channels 1-10
+        for channel in range(1, DEFAULT_CHANNEL_COUNT + 1)
     ]
 
     async_add_entities(entities)

@@ -13,6 +13,7 @@ CONF_UNIVERSE = "universe"
 
 # Default values
 DEFAULT_UNIVERSE = 0
+DEFAULT_CHANNEL_COUNT = 10
 
 # DMX constants
 DMX_CHANNELS = 512

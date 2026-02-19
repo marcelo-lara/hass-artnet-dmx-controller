@@ -48,6 +48,7 @@ class ArtNetDMXHelper:
         """Set up the UDP socket for Art-Net communication."""
         if self._socket is None:
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            # Set non-blocking for asyncio compatibility
             self._socket.setblocking(False)  # noqa: FBT003
             LOGGER.debug(
                 "Art-Net socket created for %s:%s (Universe %s)",

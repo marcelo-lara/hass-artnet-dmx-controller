@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import ipaddress
 from typing import Any
 
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.core import callback
 
 from .const import (
     CONF_TARGET_IP,
@@ -34,20 +34,24 @@ class ArtNetDMXControllerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             target_ip = user_input[CONF_TARGET_IP]
             universe = user_input[CONF_UNIVERSE]
 
-            # Basic validation
-            if not target_ip:
+            # Validate IP address format
+            try:
+                ipaddress.ip_address(target_ip)
+            except ValueError:
                 errors["base"] = "invalid_ip"
-            elif not 0 <= universe <= MAX_UNIVERSE:
-                errors["base"] = "invalid_universe"
             else:
-                # Create a unique ID based on IP and universe
-                await self.async_set_unique_id(f"{target_ip}_{universe}")
-                self._abort_if_unique_id_configured()
+                # Validate universe range
+                if not 0 <= universe <= MAX_UNIVERSE:
+                    errors["base"] = "invalid_universe"
+                else:
+                    # Create a unique ID based on IP and universe
+                    await self.async_set_unique_id(f"{target_ip}_{universe}")
+                    self._abort_if_unique_id_configured()
 
-                return self.async_create_entry(
-                    title=f"ArtNet DMX ({target_ip} U:{universe})",
-                    data=user_input,
-                )
+                    return self.async_create_entry(
+                        title=f"ArtNet DMX ({target_ip} U:{universe})",
+                        data=user_input,
+                    )
 
         # Show the form
         data_schema = vol.Schema(
@@ -67,33 +71,4 @@ class ArtNetDMXControllerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=data_schema,
             errors=errors,
-        )
-
-    @staticmethod
-    @callback
-    def async_get_options_flow(
-        config_entry: config_entries.ConfigEntry,
-    ) -> ArtNetDMXControllerOptionsFlow:
-        """Get the options flow for this handler."""
-        return ArtNetDMXControllerOptionsFlow(config_entry)
-
-
-class ArtNetDMXControllerOptionsFlow(config_entries.OptionsFlow):
-    """Handle options flow for ArtNet DMX Controller."""
-
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize options flow."""
-        self.config_entry = config_entry
-
-    async def async_step_init(
-        self,
-        user_input: dict[str, Any] | None = None,
-    ) -> config_entries.ConfigFlowResult:
-        """Manage the options."""
-        if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
-
-        return self.async_show_form(
-            step_id="init",
-            data_schema=vol.Schema({}),
         )
