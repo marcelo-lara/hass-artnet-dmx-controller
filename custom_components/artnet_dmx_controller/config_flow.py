@@ -59,7 +59,7 @@ class ArtNetDMXControllerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(
                     CONF_UNIVERSE,
                     default=(user_input or {}).get(CONF_UNIVERSE, DEFAULT_UNIVERSE),
-                ): vol.All(vol.Coerce(int), vol.Range(min=0, max=32767)),
+                ): vol.All(vol.Coerce(int), vol.Range(min=0, max=MAX_UNIVERSE)),
             }
         )
 

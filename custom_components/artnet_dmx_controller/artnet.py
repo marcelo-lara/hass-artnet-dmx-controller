@@ -48,9 +48,7 @@ class ArtNetDMXHelper:
         """Set up the UDP socket for Art-Net communication."""
         if self._socket is None:
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            self._socket.setblocking(
-                False  # noqa: FBT003
-            )
+            self._socket.setblocking(False)  # noqa: FBT003
             LOGGER.debug(
                 "Art-Net socket created for %s:%s (Universe %s)",
                 self.target_ip,
@@ -123,7 +121,7 @@ class ArtNetDMXHelper:
         packet = self.construct_artnet_packet(dmx_data)
 
         # Send using asyncio's loop to avoid blocking
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         try:
             await loop.run_in_executor(
                 None,
