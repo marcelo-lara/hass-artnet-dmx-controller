@@ -1,4 +1,4 @@
-# ArtNet DMX Controller
+# [DO NOT DOWNLOAD (YET)] ArtNet DMX Controller
 
 [![GitHub Release][releases-shield]][releases]
 [![License][license-shield]](LICENSE)
