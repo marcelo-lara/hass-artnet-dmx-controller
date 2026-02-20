@@ -15,7 +15,7 @@ from homeassistant.components.select import SelectEntity
 from .const import DEFAULT_CHANNEL_COUNT, DOMAIN, LOGGER
 from .fixture_mapping import load_fixture_mapping, HomeAssistantError
 from .channel_math import absolute_channel
-from .channel_math import value_from_label, label_from_value
+from .channel_math import value_from_label, label_from_value, clamp_dmx_value
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -205,11 +205,12 @@ class ArtNetDMXLight(LightEntity):
         """Turn the light on."""
         brightness = kwargs.get(ATTR_BRIGHTNESS, 255)
 
-        self._brightness = brightness
+        # Normalize/clamp brightness to DMX range
+        self._brightness = clamp_dmx_value(brightness)
         self._is_on = True
 
         # Send the DMX value
-        await self._artnet_helper.set_channel(self._channel, brightness)
+        await self._artnet_helper.set_channel(self._channel, int(self._brightness))
 
         LOGGER.debug(
             "Turned on DMX channel %s with brightness %s",
@@ -275,6 +276,7 @@ class ArtNetDMXSelect(SelectEntity):
     async def async_select_option(self, option: str) -> None:
         try:
             value = value_from_label(self._value_map, option)
+            value = clamp_dmx_value(value)
         except Exception:
             return
         await self._artnet_helper.set_channel(self._channel, int(value))
@@ -337,7 +339,7 @@ class ArtNetDMXRGBLight(LightEntity):
         brightness = kwargs.get(ATTR_BRIGHTNESS)
 
         if brightness is not None:
-            self._brightness = int(brightness)
+            self._brightness = clamp_dmx_value(int(brightness))
         else:
             # default full
             if self._brightness == 0:
@@ -350,13 +352,14 @@ class ArtNetDMXRGBLight(LightEntity):
         scale = self._brightness / 255.0 if self._brightness is not None else 1.0
 
         # send dim if available
+
         if self._dim is not None:
-            await self._artnet_helper.set_channel(self._dim, int(self._brightness))
+            await self._artnet_helper.set_channel(self._dim, int(clamp_dmx_value(self._brightness)))
 
         # send rgb channels scaled by brightness
-        r = int(self._rgb[0] * scale)
-        g = int(self._rgb[1] * scale)
-        b = int(self._rgb[2] * scale)
+        r = clamp_dmx_value(int(self._rgb[0] * scale))
+        g = clamp_dmx_value(int(self._rgb[1] * scale))
+        b = clamp_dmx_value(int(self._rgb[2] * scale))
         await self._artnet_helper.set_channel(self._red, r)
         await self._artnet_helper.set_channel(self._green, g)
         await self._artnet_helper.set_channel(self._blue, b)

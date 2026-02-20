@@ -1,6 +1,11 @@
 colorlog==6.10.1
 # Use a compatible Home Assistant range instead of a future exact pin
-homeassistant>=2024.1.0,<2026.0.0
+homeassistant==2026.2.2
 pip>=21.3.1
 ruff==0.15.1
 pytest==9.0.2
+# Pin cryptography and ACME-related packages to avoid pyOpenSSL deprecation noise
+cryptography>=40.0.0
+acme>=2.0.0
+# `hass-nabucasa` depends on josepy>=2,<3; allow that range instead of pinning
+josepy>=2,<3

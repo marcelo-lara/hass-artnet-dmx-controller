@@ -19,6 +19,7 @@ config/*
 
 # Venv
 hass/
+hass.*/
 
 # VS Code settings
 .vscode/
