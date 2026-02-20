@@ -93,9 +93,10 @@ class ArtNetDMXControllerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     else:
                         # Persist fixture fields into the entry data
                         entry_data = dict(user_input)
-                        # ensure start_channel and fixture_type are saved
+                        # ensure start_channel, fixture_type and channel_count are saved
                         entry_data["start_channel"] = int(start_channel)
                         entry_data["fixture_type"] = fixture_type
+                        entry_data["channel_count"] = int(channel_count)
                         return self.async_create_entry(
                             title=f"ArtNet DMX ({target_ip} U:{universe})",
                             data=entry_data,

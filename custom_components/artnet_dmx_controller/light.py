@@ -11,6 +11,8 @@ from homeassistant.components.light import (
 )
 
 from .const import DEFAULT_CHANNEL_COUNT, DOMAIN, LOGGER
+from .fixture_mapping import load_fixture_mapping, HomeAssistantError
+from .channel_math import absolute_channel
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -27,16 +29,46 @@ async def async_setup_entry(
 ) -> None:
     """Set up ArtNet DMX light entities from a config entry."""
     artnet_helper: ArtNetDMXHelper = hass.data[DOMAIN][entry.entry_id]
+    entities = []
 
-    # Create light entities for DMX channels
-    entities = [
-        ArtNetDMXLight(
-            artnet_helper=artnet_helper,
-            channel=channel,
-            entry_id=entry.entry_id,
-        )
-        for channel in range(1, DEFAULT_CHANNEL_COUNT + 1)
-    ]
+    # If fixture metadata is present on the entry, create per-fixture channels
+    fixture_type = entry.data.get("fixture_type")
+    start_channel = entry.data.get("start_channel")
+    channel_count = entry.data.get("channel_count")
+
+    if fixture_type and start_channel and channel_count:
+        try:
+            mapping = load_fixture_mapping()
+            fixture_def = mapping.get("fixtures", {}).get(fixture_type)
+            if fixture_def:
+                for ch in fixture_def.get("channels", []):
+                    offset = ch.get("offset")
+                    name = ch.get("name")
+                    hidden = bool(ch.get("hidden_by_default", False))
+                    abs_channel = absolute_channel(int(start_channel), int(offset))
+                    entities.append(
+                        ArtNetDMXLight(
+                            artnet_helper=artnet_helper,
+                            channel=abs_channel,
+                            entry_id=entry.entry_id,
+                            channel_name=name,
+                            hidden_by_default=hidden,
+                        )
+                    )
+        except HomeAssistantError:
+            # Fallback to default behavior below
+            LOGGER.exception("Failed to load fixture mapping; falling back to default channels")
+
+    if not entities:
+        # Fallback: create default channel entities
+        entities = [
+            ArtNetDMXLight(
+                artnet_helper=artnet_helper,
+                channel=channel,
+                entry_id=entry.entry_id,
+            )
+            for channel in range(1, DEFAULT_CHANNEL_COUNT + 1)
+        ]
 
     async_add_entities(entities)
 
@@ -54,6 +86,8 @@ class ArtNetDMXLight(LightEntity):
         artnet_helper: ArtNetDMXHelper,
         channel: int,
         entry_id: str,
+        channel_name: str | None = None,
+        hidden_by_default: bool = False,
     ) -> None:
         """
         Initialize the ArtNet DMX Light.
@@ -66,8 +100,14 @@ class ArtNetDMXLight(LightEntity):
         """
         self._artnet_helper = artnet_helper
         self._channel = channel
+        # Unique id includes the absolute channel number to keep stability
         self._attr_unique_id = f"{entry_id}_channel_{channel}"
-        self._attr_name = f"DMX Channel {channel}"
+        if channel_name:
+            self._attr_name = f"DMX Channel {channel} {channel_name}"
+        else:
+            self._attr_name = f"DMX Channel {channel}"
+        # Allow mapping to request the channel be disabled by default in the entity registry
+        self._attr_entity_registry_enabled_default = not bool(hidden_by_default)
         self._is_on = False
         self._brightness = 0
 
