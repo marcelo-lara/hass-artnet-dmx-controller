@@ -16,3 +16,9 @@ coverage.xml
 # Home Assistant configuration
 config/*
 !config/configuration.yaml
+
+# Venv
+hass/
+
+# VS Code settings
+.vscode/

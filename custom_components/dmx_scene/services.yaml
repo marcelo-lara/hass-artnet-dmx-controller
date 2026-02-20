@@ -1,0 +1,30 @@
+capture:
+  name: Capture a DMX scene
+  description: Capture current entity states into a named scene
+  fields:
+    name:
+      description: Name of the scene to capture
+      example: party_mode
+    entities:
+      description: Mapping of entity_id -> payload
+      example: {"light.dmx_channel_1": {"state": "on", "brightness": 128}}
+
+apply:
+  name: Apply a DMX scene
+  description: Apply a previously captured scene
+  fields:
+    name:
+      description: Name of the scene to apply
+    transition:
+      description: Optional transition time in seconds
+
+list:
+  name: List DMX scenes
+  description: Return available scenes
+
+delete:
+  name: Delete a DMX scene
+  description: Remove a scene from storage
+  fields:
+    name:
+      description: Scene name to delete

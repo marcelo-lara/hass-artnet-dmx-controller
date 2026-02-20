@@ -63,6 +63,7 @@ Build a lightweight Home Assistant DMX scene creator focused on scene capture/ap
   - Missing required keys fails with clear error.
 - Exit criteria:
   - Loader returns validated structure and all error paths are handled.
+  - Status: Done (validation tests added; cache helper added)
 
 ### Phase 2 — Config Flow Inputs for Fixture Creation
 - Extend config flow to request:
