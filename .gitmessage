@@ -1,3 +1,10 @@
+Merge MSB/LSB into 16-bit composite entities
+
+- Auto-detect *_msb/_lsb channel pairs and create a single 16-bit Light entity
+- Map 0..255 brightness to 0..65535 DMX value and write MSB+LSB channels
+- Keep unique ids stable; humanize display names
+
+All tests pass.
 Format display names: humanize fixture and channel names
 
 - Convert underscore_separated names to Title Case with spaces
