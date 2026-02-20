@@ -27,6 +27,73 @@ A Home Assistant custom integration for controlling DMX devices via the Art-Net 
 1. Copy the `custom_components/artnet_dmx_controller` directory to your Home Assistant's `custom_components` directory
 2. Restart Home Assistant
 
+## Installation instructions
+
+### HACS (recommended)
+1. In Home Assistant, go to Settings → Integrations → HACS (Community Store).
+2. Add this repository as a custom repository (type: Integration, category: Integration).
+3. Search for "ArtNet DMX Controller" in HACS and click Install.
+4. Restart Home Assistant.
+5. Configure the integration via Settings → Devices & Services → Add Integration → "ArtNet DMX Controller".
+
+### Manual installation
+1. Copy the integration folder to your Home Assistant `custom_components` directory:
+
+```bash
+# from repo root
+cp -r custom_components/artnet_dmx_controller /config/custom_components/
+```
+2. Restart Home Assistant.
+3. Configure the integration via Settings → Devices & Services → Add Integration → "ArtNet DMX Controller".
+
+### Quick verification
+- After restart, the integration should appear in Settings → Devices & Services.
+- Example entities created: `light.dmx_channel_1`, `light.dmx_channel_2`, etc.
+- If you do not see the integration, check Home Assistant logs for `artnet_dmx_controller` errors.
+
+### Notes
+- This integration uses Art-Net (UDP) to send DMX; ensure your target device IP and network allow UDP/6454 traffic.
+- For development/testing, run Home Assistant in a dev environment and monitor logs while adding the integration.
+
+## Python virtual environment (`hass`)
+
+Create and activate a local Python virtual environment named `hass` before running development commands.
+
+### Linux / macOS
+
+```bash
+# from repo root
+python3 -m venv hass
+source hass/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+### Windows (PowerShell)
+
+```powershell
+# from repo root
+py -m venv hass
+.\hass\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+### Deactivate
+
+```bash
+deactivate
+```
+
+### Running tests
+
+After activating the `hass` virtual environment and installing dependencies, run the project's tests:
+
+```bash
+# from repo root (with the `hass` venv activated)
+pytest -q
+```
+
 ## Configuration
 
 1. Go to Settings → Devices & Services
@@ -47,6 +114,55 @@ Example entity names:
 - `light.dmx_channel_1`
 - `light.dmx_channel_2`
 - etc.
+
+## Fixture Mapping & Config Flow
+
+- This integration uses a shared `fixture_mapping.json` as the single source of truth for fixture models and channel definitions. Fixture models include channel offsets, channel counts, and optional `value_map` entries for selector-type channels.
+- When adding a new fixture via the UI (no YAML required), the config flow will prompt for a `fixture_type` (model) and a `start_channel`. The integration will create a device and child entities derived from the selected model.
+
+Note: Entities created for a fixture depend on the chosen `fixture_type` and `start_channel`. Names and numbers may therefore vary by model.
+
+## Scenes (Record / Play)
+
+The integration provides simple scene persistence and playback services registered under the integration domain (`artnet_dmx_controller`). These services operate on the DMX-level payloads captured from the current integration state.
+
+Service names and example usage (Developer Tools → Services):
+
+- `artnet_dmx_controller.record_scene` — Record the current DMX state for an entry (config entry) into a named scene.
+   - Required data: `entry_id` (the config entry id), `name` (scene name)
+
+Example (YAML payload in Developer Tools):
+
+```yaml
+service: artnet_dmx_controller.record_scene
+data:
+   entry_id: your_entry_id_here
+   name: evening_preset
+```
+
+- `artnet_dmx_controller.play_scene` — Play an existing scene for a given entry.
+   - Required data: `entry_id`, `name`; Optional: `transition` (seconds)
+
+```yaml
+service: artnet_dmx_controller.play_scene
+data:
+   entry_id: your_entry_id_here
+   name: evening_preset
+   transition: 1
+```
+
+- `artnet_dmx_controller.list_scenes` — Log or list available scenes (no data required).
+
+- `artnet_dmx_controller.delete_scene` — Delete a saved scene by name.
+   - Required data: `name`
+
+```yaml
+service: artnet_dmx_controller.delete_scene
+data:
+   name: evening_preset
+```
+
+Scenes are stored in the integration's internal storage and survive restarts.
 
 ## Art-Net Protocol Details
 

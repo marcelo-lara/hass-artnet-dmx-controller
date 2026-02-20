@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "fixtures": {
+    "mini_beam_prism": {
+      "fixture_specie": "moving_head",
+      "source_fixture_ids": ["mini_beam_prism_l", "mini_beam_prism_r"],
+      "channel_count": 12,
+      "channels": [
+        { "name": "pan_msb", "offset": 1, "description": "Pan coarse (16-bit high byte)" },
+        { "name": "pan_lsb", "offset": 2, "description": "Pan fine (16-bit low byte)" },
+        { "name": "tilt_msb", "offset": 3, "description": "Tilt coarse (16-bit high byte)" },
+        { "name": "tilt_lsb", "offset": 4, "description": "Tilt fine (16-bit low byte)" },
+        { "name": "speed", "offset": 5, "description": "Pan/tilt movement speed" },
+        { "name": "dim", "offset": 6, "description": "Master dimmer" },
+        { "name": "strobe", "offset": 7, "description": "Strobe/shutter speed" },
+        {
+          "name": "color",
+          "offset": 8,
+          "description": "Color wheel selection",
+          "value_map": {
+            "0": "Open/White",
+            "15": "Red",
+            "25": "Orange",
+            "35": "Yellow",
+            "45": "Green",
+            "55": "Blue",
+            "65": "Indigo",
+            "75": "Cyan",
+            "85": "Cool White",
+            "95": "Magenta",
+            "110": "Warm",
+            "160": "Forward rotation",
+            "220": "Reverse rotation"
+          }
+        },
+        {
+          "name": "gobo",
+          "offset": 9,
+          "description": "Gobo wheel selection",
+          "value_map": {
+            "0": "Open",
+            "8": "Gobo 1",
+            "13": "Gobo 2",
+            "18": "Gobo 3",
+            "23": "Gobo 4",
+            "28": "Gobo 5",
+            "33": "Gobo 6",
+            "38": "Gobo 7",
+            "43": "Gobo 8",
+            "48": "Gobo 9",
+            "53": "Gobo 10",
+            "58": "Gobo 11",
+            "63": "Gobo 12",
+            "68": "Gobo 13",
+            "73": "Gobo 14",
+            "115": "Shake",
+            "175": "Forward rotation",
+            "230": "Reverse rotation"
+          }
+        },
+        { "name": "prism", "offset": 10, "description": "Prism on/rotate" },
+        { "name": "autoplay", "offset": 11, "description": "Auto/sound program select" },
+        {
+          "name": "reset",
+          "offset": 12,
+          "description": "Fixture reset trigger",
+          "hidden_by_default": true
+        }
+      ]
+    },
+    "head_el150": {
+      "fixture_specie": "moving_head",
+      "source_fixture_ids": ["head_el150"],
+      "channel_count": 9,
+      "channels": [
+        { "name": "pan_msb", "offset": 1, "description": "Pan coarse (16-bit high byte)" },
+        { "name": "pan_lsb", "offset": 2, "description": "Pan fine (16-bit low byte)" },
+        { "name": "tilt_msb", "offset": 3, "description": "Tilt coarse (16-bit high byte)" },
+        { "name": "tilt_lsb", "offset": 4, "description": "Tilt fine (16-bit low byte)" },
+        { "name": "speed", "offset": 5, "description": "Pan/tilt movement speed" },
+        { "name": "dim", "offset": 6, "description": "Master dimmer" },
+        { "name": "shutter", "offset": 7, "description": "Shutter/strobe" },
+        {
+          "name": "color",
+          "offset": 8,
+          "description": "Color wheel selection",
+          "value_map": {
+            "0": "White",
+            "25": "Orange",
+            "50": "Cyan",
+            "75": "Purple",
+            "100": "Yellow",
+            "125": "Green",
+            "150": "Blue",
+            "175": "Red"
+          }
+        },
+        {
+          "name": "gobo",
+          "offset": 9,
+          "description": "Gobo wheel selection",
+          "value_map": {
+            "0": "Open",
+            "25": "Tunnel",
+            "50": "BigOval",
+            "75": "SmallOval",
+            "100": "Squares",
+            "125": "Shapes",
+            "150": "Tribal",
+            "175": "Slashes"
+          }
+        }
+      ]
+    },
+    "parcan": {
+      "fixture_specie": "parcan",
+      "source_fixture_ids": ["parcan_l"],
+      "channel_count": 5,
+      "channels": [
+        { "name": "dim", "offset": 1, "description": "Master dimmer" },
+        { "name": "red", "offset": 2, "description": "Red intensity" },
+        { "name": "green", "offset": 3, "description": "Green intensity" },
+        { "name": "blue", "offset": 4, "description": "Blue intensity" },
+        { "name": "strobe", "offset": 5, "description": "Strobe speed" }
+      ]
+    },
+    "proton": {
+      "fixture_specie": "parcan",
+      "source_fixture_ids": ["parcan_r", "parcan_pl", "parcan_pr"],
+      "channel_count": 6,
+      "channels": [
+        { "name": "dim", "offset": 1, "description": "Master dimmer" },
+        { "name": "red", "offset": 2, "description": "Red intensity" },
+        { "name": "green", "offset": 3, "description": "Green intensity" },
+        { "name": "blue", "offset": 4, "description": "Blue intensity" },
+        { "name": "strobe", "offset": 5, "description": "Strobe speed" },
+        {
+          "name": "program",
+          "offset": 6,
+          "description": "Built-in program selection",
+          "hidden_by_default": true
+        }
+      ]
+    }
+  }
+}

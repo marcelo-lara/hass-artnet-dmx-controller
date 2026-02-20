@@ -17,5 +17,23 @@
     "abort": {
       "already_configured": "Device is already configured"
     }
+  },
+  "services": {
+    "record_scene": {
+      "name": "Record DMX Scene",
+      "description": "Record the current DMX channel values into a named scene"
+    },
+    "play_scene": {
+      "name": "Play DMX Scene",
+      "description": "Apply a previously recorded DMX scene to the fixture"
+    },
+    "list_scenes": {
+      "name": "List DMX Scenes",
+      "description": "List stored DMX scenes in the integration"
+    },
+    "delete_scene": {
+      "name": "Delete DMX Scene",
+      "description": "Delete a stored DMX scene by name"
+    }
   }
 }
