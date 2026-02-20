@@ -1,0 +1,7 @@
+Format display names: humanize fixture and channel names
+
+- Convert underscore_separated names to Title Case with spaces
+- Keep unique_ids unchanged
+- Mark autoplay channels hidden by default in fixture mapping
+
+Run tests and updated tests to be robust to casing.

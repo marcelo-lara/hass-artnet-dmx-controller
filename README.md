@@ -87,11 +87,15 @@ deactivate
 
 ### Running tests
 
-After activating the `hass` virtual environment and installing dependencies, run the project's tests:
+Use the `hass` virtual environment bundled in this repository. You can either activate it, or run commands directly with the included interpreter. Example (recommended):
 
 ```bash
-# from repo root (with the `hass` venv activated)
-pytest -q
+# from repo root — install or upgrade pip first
+hass/bin/python -m pip install --upgrade pip
+hass/bin/python -m pip install -r requirements.txt
+
+# Run tests using the hass interpreter
+hass/bin/python -m pytest -q
 ```
 
 ## Configuration

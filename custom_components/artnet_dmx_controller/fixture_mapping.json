@@ -59,7 +59,7 @@
           }
         },
         { "name": "prism", "offset": 10, "description": "Prism on/rotate" },
-        { "name": "autoplay", "offset": 11, "description": "Auto/sound program select" },
+        { "name": "autoplay", "offset": 11, "description": "Auto/sound program select", "hidden_by_default": true },
         {
           "name": "reset",
           "offset": 12,
