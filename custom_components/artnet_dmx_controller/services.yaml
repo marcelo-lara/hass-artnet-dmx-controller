@@ -1,0 +1,33 @@
+record_scene:
+  name: Record DMX Scene
+  description: Record the current DMX channel values into a named scene
+  fields:
+    entry_id:
+      description: Config entry id for which to record the scene
+      example: a1b2c3d4e5f6
+    name:
+      description: Name of the scene to capture
+      example: party_mode
+
+play_scene:
+  name: Play DMX Scene
+  description: Apply a previously recorded DMX scene to the fixture
+  fields:
+    entry_id:
+      description: Config entry id for which to play the scene
+    name:
+      description: Name of the scene to play
+    transition:
+      description: Optional transition time in seconds
+
+list_scenes:
+  name: List DMX Scenes
+  description: Return available scenes stored in the DMX SceneStore
+
+delete_scene:
+  name: Delete DMX Scene
+  description: Remove a scene from storage
+  fields:
+    name:
+      description: Scene name to delete
+      example: party_mode
