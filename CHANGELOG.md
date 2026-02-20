@@ -2,6 +2,9 @@
 
 ## Unreleased
 
-- Implement Phase 4: centralized DMX write helper `DMXWriter` (batches writes and falls back to single-channel helpers).
-- Refactor light entities to prefer the centralized DMX writer for bulk writes.
-- Add unit tests for `DMXWriter` batching and fallback behavior.
+ - Moved `dmx_scene` functionality into `custom_components/artnet_dmx_controller/scene/`.
+ - Added config flow inputs for fixture creation (`fixture_type`, `start_channel`), validation and mapping-driven entity creation.
+ - Implemented centralized DMX writer with batching and fallback.
+ - Added scene record/play/list/delete services under `artnet_dmx_controller` domain.
+ - Updated README and docs to reflect integration restructuring.
+ - Updated `hacs.json` metadata for HACS compatibility.
