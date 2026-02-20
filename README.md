@@ -115,6 +115,55 @@ Example entity names:
 - `light.dmx_channel_2`
 - etc.
 
+## Fixture Mapping & Config Flow
+
+- This integration uses a shared `fixture_mapping.json` as the single source of truth for fixture models and channel definitions. Fixture models include channel offsets, channel counts, and optional `value_map` entries for selector-type channels.
+- When adding a new fixture via the UI (no YAML required), the config flow will prompt for a `fixture_type` (model) and a `start_channel`. The integration will create a device and child entities derived from the selected model.
+
+Note: Entities created for a fixture depend on the chosen `fixture_type` and `start_channel`. Names and numbers may therefore vary by model.
+
+## Scenes (Record / Play)
+
+The integration provides simple scene persistence and playback services registered under the integration domain (`artnet_dmx_controller`). These services operate on the DMX-level payloads captured from the current integration state.
+
+Service names and example usage (Developer Tools → Services):
+
+- `artnet_dmx_controller.record_scene` — Record the current DMX state for an entry (config entry) into a named scene.
+   - Required data: `entry_id` (the config entry id), `name` (scene name)
+
+Example (YAML payload in Developer Tools):
+
+```yaml
+service: artnet_dmx_controller.record_scene
+data:
+   entry_id: your_entry_id_here
+   name: evening_preset
+```
+
+- `artnet_dmx_controller.play_scene` — Play an existing scene for a given entry.
+   - Required data: `entry_id`, `name`; Optional: `transition` (seconds)
+
+```yaml
+service: artnet_dmx_controller.play_scene
+data:
+   entry_id: your_entry_id_here
+   name: evening_preset
+   transition: 1
+```
+
+- `artnet_dmx_controller.list_scenes` — Log or list available scenes (no data required).
+
+- `artnet_dmx_controller.delete_scene` — Delete a saved scene by name.
+   - Required data: `name`
+
+```yaml
+service: artnet_dmx_controller.delete_scene
+data:
+   name: evening_preset
+```
+
+Scenes are stored in the integration's internal storage and survive restarts.
+
 ## Art-Net Protocol Details
 
 This integration implements the Art-Net protocol for DMX lighting control:

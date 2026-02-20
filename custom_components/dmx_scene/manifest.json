@@ -1,9 +1,0 @@
-{
-  "domain": "dmx_scene",
-  "name": "DMX Scene",
-  "version": "0.1.0",
-  "documentation": "https://github.com/marcelo-lara/hass-artnet-dmx-controller",
-  "requirements": [],
-  "dependencies": [],
-  "codeowners": []
-}

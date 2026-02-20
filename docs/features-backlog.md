@@ -161,10 +161,11 @@ Build a lightweight Home Assistant DMX scene creator focused on scene capture/ap
 ## Current Status Snapshot
 
 ### Implemented
-- Custom integration scaffold: `custom_components/dmx_scene/`
-- Services: `capture`, `apply`, `delete`, `list`
-- Storage-backed scene repository
-- `dmx_scene:` added to `configuration.yaml`
+### Implemented
+- Custom integration scaffold: `custom_components/artnet_dmx_controller/`
+- Services (registered under the integration domain `artnet_dmx_controller`): `record_scene`, `play_scene`, `list_scenes`, `delete_scene`
+- Storage-backed scene repository (internal `scene` subpackage)
+- Integration config entries and options are managed via the config flow (no YAML required)
 
 ### Needs Verification First
 - Restart Home Assistant and confirm services are registered
@@ -193,7 +194,7 @@ Build a lightweight Home Assistant DMX scene creator focused on scene capture/ap
 ### Storage
 - Home Assistant `Store` (`.storage` managed by integration)
 - Versioned storage schema for forward migration
-- Fixture metadata source: `custom_components/dmx_scene/fixtures.json`
+- Fixture metadata source: `custom_components/artnet_dmx_controller/fixture_mapping.json`
 
 ---
 
@@ -202,12 +203,12 @@ Build a lightweight Home Assistant DMX scene creator focused on scene capture/ap
 ## Phase 1 — Stabilize MVP Engine
 ### Deliverables
 - Service schemas hardened (input validation + clear errors)
-- Deterministic scene overwrite behavior (`capture` same name)
+- Deterministic scene overwrite behavior (`record_scene` same name)
 - Better list output format (`count`, `names`, metadata)
-- Basic diagnostics logging for capture/apply/delete
+- Basic diagnostics logging for record/play/delete
 
 ### Acceptance
-- Capture -> Apply -> Delete succeeds for all fixture families:
+- Record -> Play -> Delete succeeds for all fixture families:
   - `head_*`
   - `mini_beam_*`
   - `parcan_*`
@@ -271,10 +272,10 @@ Build a lightweight Home Assistant DMX scene creator focused on scene capture/ap
 ## LLM Session Workflow (Use Every Time)
 
 1. Read current files first:
-   - `custom_components/dmx_scene/__init__.py`
-   - `custom_components/dmx_scene/scene_store.py`
-   - `custom_components/dmx_scene/services.yaml`
-   - `configuration.yaml`
+  - `custom_components/artnet_dmx_controller/__init__.py`
+  - `custom_components/artnet_dmx_controller/scene/scene_store.py`
+  - `custom_components/artnet_dmx_controller/scene/services.yaml`
+  - `configuration.yaml`
 2. State assumptions explicitly before coding
 3. Make smallest viable patch
 4. Validate with HA checks/restart logs when possible
@@ -285,10 +286,10 @@ Build a lightweight Home Assistant DMX scene creator focused on scene capture/ap
 ## Resume Checklist (Next Session)
 
 - [ ] Restart Home Assistant
-- [ ] Verify `dmx_scene.*` services appear in Developer Tools
-- [ ] Test `capture` with a known scene name
-- [ ] Test `apply` with and without transition
-- [ ] Test `delete` and confirm removal via `list`
+- [ ] Verify `artnet_dmx_controller.*` services appear in Developer Tools
+- [ ] Test `record_scene` with a known scene name
+- [ ] Test `play_scene` with and without transition
+- [ ] Test `delete_scene` and confirm removal via `list_scenes`
 - [ ] Log any entity compatibility mismatches
 
 ---
@@ -296,22 +297,22 @@ Build a lightweight Home Assistant DMX scene creator focused on scene capture/ap
 ## Ready-to-Paste Prompts for LLM Coding
 
 ### Prompt A — MVP Validation Hardening
-"Read `custom_components/dmx_scene/*` and improve service validation/errors only. Do not add new features. Add clear HomeAssistantError messages and keep patches minimal."
+"Read `custom_components/artnet_dmx_controller/*` and improve service validation/errors only. Do not add new features. Add clear HomeAssistantError messages and keep patches minimal."
 
 ### Prompt B — Minimal Lovelace UX
-"Create a minimal dashboard workflow for dmx scenes using helpers/scripts (no custom frontend card). Add only what is required for capture/apply/delete from UI."
+"Create a minimal dashboard workflow for DMX scenes using helpers/scripts (no custom frontend card). Add only what is required for `record_scene`/`play_scene`/`delete_scene` from UI."
 
 ### Prompt C — Grouped Apply
-"Add support to apply scenes to an optional subset/group of entities while preserving existing default behavior. Include service schema updates and docs."
+"Add support to play scenes to an optional subset/group of entities while preserving existing default behavior. Include service schema updates and docs."
 
 ### Prompt D — HACS Readiness
-"Prepare `dmx_scene` for external HACS repository: add `hacs.json`, tighten manifest metadata, and update README install instructions."
+"Prepare `artnet_dmx_controller` for external HACS repository: add `hacs.json`, tighten manifest metadata, and update README install instructions."
 
 ---
 
 ## Definition of Done (Per Phase)
 
-- Code merged in `custom_components/dmx_scene/`
+- Code merged in `custom_components/artnet_dmx_controller/`
 - Services visible and callable in HA Developer Tools
 - One happy-path test and one failure-path test executed manually
 - Backlog updated with what changed, what failed, and next action
@@ -323,7 +324,7 @@ Build a lightweight Home Assistant DMX scene creator focused on scene capture/ap
 - **Risk:** Entity naming drift breaks default DMX discovery
   - **Mitigation:** Add configurable include patterns or explicit entity list
 - **Risk:** Attribute mismatch across light platforms
-  - **Mitigation:** Capture/apply only supported attributes per entity state
+  - **Mitigation:** Record/play only supported attributes per entity state
 - **Risk:** UI complexity creep toward full controller
   - **Mitigation:** Enforce strict in-scope/out-of-scope checklist before each phase
 
@@ -351,12 +352,12 @@ Must not add yet:
 Complete Phase 1 verification and hardening so the MVP scene engine is stable before building UI.
 
 ### Step-by-Step (In Order)
-1. Restart Home Assistant and confirm `dmx_scene` loads without errors.
+1. Restart Home Assistant and confirm `artnet_dmx_controller` integration loads without errors.
 2. In Developer Tools, run:
-  - `dmx_scene.list`
-  - `dmx_scene.capture` (name: `test_scene`)
-  - `dmx_scene.apply` (name: `test_scene`, transition: `1`)
-  - `dmx_scene.delete` (name: `test_scene`)
+  - `artnet_dmx_controller.list_scenes`
+  - `artnet_dmx_controller.record_scene` (entry_id: `<entry_id>`, name: `test_scene`)
+  - `artnet_dmx_controller.play_scene` (entry_id: `<entry_id>`, name: `test_scene`, transition: `1`)
+  - `artnet_dmx_controller.delete_scene` (name: `test_scene`)
 3. Record actual results and any error text in this file.
 4. Harden validation/errors only (no new features):
   - clearer messages for missing entities/empty captures
@@ -372,7 +373,7 @@ Complete Phase 1 verification and hardening so the MVP scene engine is stable be
 
 ### If Time Remains
 - Start Phase 2 with a minimal UI workflow using helpers + scripts only
-- Keep scope to capture/apply/delete from dashboard (no custom card)
+-- Keep scope to record/play/delete from dashboard (no custom card)
 
 ### Session Start Prompt (Copy/Paste)
-"Continue Phase 1 in `custom_components/dmx_scene`. First verify services in Home Assistant from the existing checklist, then implement only validation/list-response hardening. Keep patches minimal and update `dmx_backlog.md` with test outcomes."
+"Continue Phase 1 in `custom_components/artnet_dmx_controller`. First verify services in Home Assistant from the existing checklist, then implement only validation/list-response hardening. Keep patches minimal and update `features-backlog.md` with test outcomes."

@@ -130,3 +130,34 @@ class ArtNetDMXControllerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=data_schema,
             errors=errors,
         )
+
+
+class OptionsFlowHandler(config_entries.OptionsFlow):
+    """Handle options for ArtNet DMX Controller config entries."""
+
+    def __init__(self, config_entry):
+        self.config_entry = config_entry
+
+    async def async_step_init(self, user_input=None):
+        """Manage options: default transition and scene exposure."""
+        errors = {}
+
+        if user_input is not None:
+            # Persist options
+            return self.async_create_entry(title="", data=user_input)
+
+        # Present current options with defaults
+        opts = self.config_entry.options or {}
+        data_schema = vol.Schema(
+            {
+                vol.Optional("default_transition", default=opts.get("default_transition", 0)):
+                vol.All(vol.Coerce(int), vol.Range(min=0)),
+                vol.Optional("expose_scenes", default=opts.get("expose_scenes", True)): bool,
+            }
+        )
+
+        return self.async_show_form(step_id="init", data_schema=data_schema, errors=errors)
+
+
+async def async_get_options_flow(config_entry):
+    return OptionsFlowHandler(config_entry)

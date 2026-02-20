@@ -16,6 +16,7 @@ from .const import DEFAULT_CHANNEL_COUNT, DOMAIN, LOGGER
 from .fixture_mapping import load_fixture_mapping, HomeAssistantError
 from .channel_math import absolute_channel
 from .channel_math import value_from_label, label_from_value, clamp_dmx_value
+from .dmx_writer import DMXWriter
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -32,6 +33,8 @@ async def async_setup_entry(
 ) -> None:
     """Set up ArtNet DMX light entities from a config entry."""
     artnet_helper: ArtNetDMXHelper = hass.data[DOMAIN][entry.entry_id]
+    # Create a centralized DMX writer for this config entry
+    dmx_writer = DMXWriter(artnet_helper)
     entities = []
 
     # If fixture metadata is present on the entry, create per-fixture channels
@@ -89,6 +92,7 @@ async def async_setup_entry(
                             entities.append(
                                 ArtNetDMXRGBLight(
                                     artnet_helper=artnet_helper,
+                                    dmx_writer=dmx_writer,
                                     red_channel=abs_red,
                                     green_channel=abs_green,
                                     blue_channel=abs_blue,
@@ -113,6 +117,7 @@ async def async_setup_entry(
                             entities.append(
                                 ArtNetDMXSelect(
                                     artnet_helper=artnet_helper,
+                                    dmx_writer=dmx_writer,
                                     channel=abs_channel,
                                     entry_id=entry.entry_id,
                                     channel_name=name,
@@ -124,6 +129,7 @@ async def async_setup_entry(
                             entities.append(
                                 ArtNetDMXLight(
                                     artnet_helper=artnet_helper,
+                                    dmx_writer=dmx_writer,
                                     channel=abs_channel,
                                     entry_id=entry.entry_id,
                                     channel_name=name,
@@ -139,6 +145,7 @@ async def async_setup_entry(
         entities = [
             ArtNetDMXLight(
                 artnet_helper=artnet_helper,
+                dmx_writer=dmx_writer,
                 channel=channel,
                 entry_id=entry.entry_id,
             )
@@ -163,6 +170,7 @@ class ArtNetDMXLight(LightEntity):
         entry_id: str,
         channel_name: str | None = None,
         hidden_by_default: bool = False,
+        dmx_writer: DMXWriter | None = None,
     ) -> None:
         """
         Initialize the ArtNet DMX Light.
@@ -174,6 +182,8 @@ class ArtNetDMXLight(LightEntity):
 
         """
         self._artnet_helper = artnet_helper
+        # Prefer using the centralized DMX writer when provided
+        self._dmx_writer = dmx_writer
         self._channel = channel
         # Unique id includes the absolute channel number to keep stability
         self._attr_unique_id = f"{entry_id}_channel_{channel}"
@@ -210,7 +220,10 @@ class ArtNetDMXLight(LightEntity):
         self._is_on = True
 
         # Send the DMX value
-        await self._artnet_helper.set_channel(self._channel, int(self._brightness))
+        if self._dmx_writer is not None:
+            await self._dmx_writer.set_channel(self._channel, int(self._brightness))
+        else:
+            await self._artnet_helper.set_channel(self._channel, int(self._brightness))
 
         LOGGER.debug(
             "Turned on DMX channel %s with brightness %s",
@@ -227,7 +240,10 @@ class ArtNetDMXLight(LightEntity):
         self._is_on = False
 
         # Send DMX value 0
-        await self._artnet_helper.set_channel(self._channel, 0)
+        if self._dmx_writer is not None:
+            await self._dmx_writer.set_channel(self._channel, 0)
+        else:
+            await self._artnet_helper.set_channel(self._channel, 0)
 
         LOGGER.debug("Turned off DMX channel %s", self._channel)
 
@@ -249,8 +265,10 @@ class ArtNetDMXSelect(SelectEntity):
         channel_name: str | None = None,
         value_map: dict | None = None,
         hidden_by_default: bool = False,
+        dmx_writer: DMXWriter | None = None,
     ) -> None:
         self._artnet_helper = artnet_helper
+        self._dmx_writer = dmx_writer
         self._channel = channel
         self._value_map = value_map or {}
         self._attr_unique_id = f"{entry_id}_channel_{channel}"
@@ -279,7 +297,10 @@ class ArtNetDMXSelect(SelectEntity):
             value = clamp_dmx_value(value)
         except Exception:
             return
-        await self._artnet_helper.set_channel(self._channel, int(value))
+        if self._dmx_writer is not None:
+            await self._dmx_writer.set_channel(self._channel, int(value))
+        else:
+            await self._artnet_helper.set_channel(self._channel, int(value))
         self._current = option
         try:
             self.async_write_ha_state()
@@ -306,8 +327,10 @@ class ArtNetDMXRGBLight(LightEntity):
         dim_channel: int | None,
         entry_id: str,
         channel_name: str | None = None,
+        dmx_writer: DMXWriter | None = None,
     ) -> None:
         self._artnet_helper = artnet_helper
+        self._dmx_writer = dmx_writer
         self._red = red_channel
         self._green = green_channel
         self._blue = blue_channel
@@ -354,15 +377,21 @@ class ArtNetDMXRGBLight(LightEntity):
         # send dim if available
 
         if self._dim is not None:
-            await self._artnet_helper.set_channel(self._dim, int(clamp_dmx_value(self._brightness)))
+            if self._dmx_writer is not None:
+                await self._dmx_writer.set_channel(self._dim, int(clamp_dmx_value(self._brightness)))
+            else:
+                await self._artnet_helper.set_channel(self._dim, int(clamp_dmx_value(self._brightness)))
 
         # send rgb channels scaled by brightness
         r = clamp_dmx_value(int(self._rgb[0] * scale))
         g = clamp_dmx_value(int(self._rgb[1] * scale))
         b = clamp_dmx_value(int(self._rgb[2] * scale))
-        await self._artnet_helper.set_channel(self._red, r)
-        await self._artnet_helper.set_channel(self._green, g)
-        await self._artnet_helper.set_channel(self._blue, b)
+        if self._dmx_writer is not None:
+            await self._dmx_writer.set_channels({self._red: r, self._green: g, self._blue: b})
+        else:
+            await self._artnet_helper.set_channel(self._red, r)
+            await self._artnet_helper.set_channel(self._green, g)
+            await self._artnet_helper.set_channel(self._blue, b)
 
         self._is_on = True
         try:
@@ -373,10 +402,16 @@ class ArtNetDMXRGBLight(LightEntity):
     async def async_turn_off(self, **_kwargs: Any) -> None:
         # set rgb channels to 0 and dim to 0 if present
         if self._dim is not None:
-            await self._artnet_helper.set_channel(self._dim, 0)
-        await self._artnet_helper.set_channel(self._red, 0)
-        await self._artnet_helper.set_channel(self._green, 0)
-        await self._artnet_helper.set_channel(self._blue, 0)
+            if self._dmx_writer is not None:
+                await self._dmx_writer.set_channel(self._dim, 0)
+            else:
+                await self._artnet_helper.set_channel(self._dim, 0)
+        if self._dmx_writer is not None:
+            await self._dmx_writer.set_channels({self._red: 0, self._green: 0, self._blue: 0})
+        else:
+            await self._artnet_helper.set_channel(self._red, 0)
+            await self._artnet_helper.set_channel(self._green, 0)
+            await self._artnet_helper.set_channel(self._blue, 0)
         self._is_on = False
         try:
             self.async_write_ha_state()

@@ -1,0 +1,21 @@
+{
+  "title": "DMX Scenes",
+  "services": {
+    "capture": {
+      "name": "Capture DMX Scene",
+      "description": "Capture current DMX channel values into a named scene"
+    },
+    "apply": {
+      "name": "Apply DMX Scene",
+      "description": "Apply a previously captured DMX scene"
+    },
+    "list": {
+      "name": "List DMX Scenes",
+      "description": "List stored DMX scenes"
+    },
+    "delete": {
+      "name": "Delete DMX Scene",
+      "description": "Delete a stored DMX scene by name"
+    }
+  }
+}

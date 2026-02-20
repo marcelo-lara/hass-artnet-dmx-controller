@@ -1,14 +1,13 @@
-"""Simple SceneStore using Home Assistant Store helper when available.
+"""SceneStore for the ArtNet DMX Controller integration.
 
-This is a minimal scaffold: scenes are kept in memory and persisted via the
-Home Assistant `Store` helper (if available). Each scene has a name, created_at,
-and entities mapping.
+Persistent store key and implementation live under the integration
+`custom_components/artnet_dmx_controller/scene`.
 """
 from __future__ import annotations
 
 from typing import Any, Dict
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 try:
     from homeassistant.helpers.storage import Store
@@ -20,7 +19,7 @@ except Exception:  # pragma: no cover - allow running tests outside HA
 _LOGGER = logging.getLogger(__name__)
 
 STORAGE_VERSION = 1
-STORAGE_KEY = "dmx_scene_store"
+STORAGE_KEY = "artnet_dmx_controller_scene_store"
 
 
 class SceneStore:
@@ -48,7 +47,8 @@ class SceneStore:
         await self._store.async_save(payload)
 
     async def async_capture(self, name: str, entities: Dict[str, Any]) -> None:
-        self._data[name] = {"name": name, "created_at": datetime.utcnow().isoformat(), "entities": entities}
+        # Use timezone-aware UTC timestamp
+        self._data[name] = {"name": name, "created_at": datetime.now(timezone.utc).isoformat(), "entities": entities}
         await self.async_save()
 
     async def async_apply(self, name: str, transition: int | None = None) -> None:

@@ -1,17 +1,17 @@
 capture:
   name: Capture a DMX scene
-  description: Capture current entity states into a named scene
+  description: Capture current DMX channel values into a named scene
   fields:
     name:
       description: Name of the scene to capture
       example: party_mode
     entities:
-      description: Mapping of entity_id -> payload
+      description: Mapping of entity_id -> payload (optional)
       example: {"light.dmx_channel_1": {"state": "on", "brightness": 128}}
 
 apply:
   name: Apply a DMX scene
-  description: Apply a previously captured scene
+  description: Apply a previously captured DMX scene by writing saved DMX channel values
   fields:
     name:
       description: Name of the scene to apply
@@ -20,7 +20,7 @@ apply:
 
 list:
   name: List DMX scenes
-  description: Return available scenes
+  description: Return available scenes stored in the DMX SceneStore
 
 delete:
   name: Delete a DMX scene
