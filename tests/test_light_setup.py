@@ -43,13 +43,15 @@ def test_async_setup_entry_creates_fixture_entities():
     # Run the async setup
     asyncio.run(async_setup_entry(hass, entry, async_add_entities))
 
-    # Expect 5 entities created for parcan
-    assert len(added) == 5
+    # Expect composite RGB + strobe for parcan -> 2 entities
+    assert len(added) == 2
 
-    # Verify channels are absolute: start_channel + offset - 1
-    channels = [e._channel for e in added]
-    assert channels == [10 + i for i in range(5)]
+    # Find rgb composite entity (we detect by presence of internal _red attribute)
+    rgb_entities = [e for e in added if hasattr(e, "_red") and hasattr(e, "_green") and hasattr(e, "_blue")]
+    assert len(rgb_entities) == 1
+    strobe_entities = [e for e in added if e not in rgb_entities]
+    assert len(strobe_entities) == 1
 
     # Ensure unique ids present and stable
     unique_ids = {e._attr_unique_id for e in added}
-    assert len(unique_ids) == 5
+    assert len(unique_ids) == 2

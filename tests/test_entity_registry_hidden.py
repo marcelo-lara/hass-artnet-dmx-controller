@@ -41,16 +41,20 @@ def test_hidden_by_default_sets_entity_registry_enabled_default():
     # Monkeypatch the loader in the light module so async_setup_entry uses our mapping
     import importlib
     light_mod = importlib.import_module("custom_components.artnet_dmx_controller.light")
+    orig_loader = light_mod.load_fixture_mapping
     light_mod.load_fixture_mapping = lambda: mapping
 
-    entry = SimpleNamespace(entry_id=entry_id, data={"fixture_type": "mix", "start_channel": 5, "channel_count": 3})
+    try:
+        entry = SimpleNamespace(entry_id=entry_id, data={"fixture_type": "mix", "start_channel": 5, "channel_count": 3})
 
-    added = []
+        added = []
 
-    def async_add_entities(entities):
-        added.extend(entities)
+        def async_add_entities(entities):
+            added.extend(entities)
 
-    asyncio.run(async_setup_entry(hass, entry, async_add_entities))
+        asyncio.run(async_setup_entry(hass, entry, async_add_entities))
+    finally:
+        light_mod.load_fixture_mapping = orig_loader
 
     # Expect 3 entities created
     assert len(added) == 3
