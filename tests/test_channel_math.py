@@ -1,12 +1,11 @@
 import pytest
 
-from custom_components.artnet_dmx_controller import channel_math
 from custom_components.artnet_dmx_controller.channel_math import (
     absolute_channel,
-    validate_dmx_value,
     clamp_dmx_value,
-    value_from_label,
     label_from_value,
+    validate_dmx_value,
+    value_from_label,
 )
 
 

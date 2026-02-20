@@ -1,7 +1,6 @@
 import asyncio
-from types import SimpleNamespace
-
 import importlib
+from types import SimpleNamespace
 
 from custom_components.artnet_dmx_controller.light import async_setup_entry
 

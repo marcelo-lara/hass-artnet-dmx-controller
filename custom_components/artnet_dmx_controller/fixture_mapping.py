@@ -1,4 +1,5 @@
-"""Fixture mapping loader and validator.
+"""
+Fixture mapping loader and validator.
 
 Loads `fixture_mapping.json`, validates schema strictly, and caches the parsed
 structure for runtime use by the integration.
@@ -10,7 +11,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Dict, Optional
+from typing import Any
 
 try:
     from homeassistant.exceptions import HomeAssistantError
@@ -18,15 +19,16 @@ except Exception:  # pragma: no cover - allow running tests outside HA
     class HomeAssistantError(Exception):
         """Fallback exception when Home Assistant isn't available."""
 
-_CACHE: Dict[str, Any] | None = None
+_CACHE: dict[str, Any] | None = None
 
 
 def _default_path() -> str:
     return os.path.join(os.path.dirname(__file__), "fixture_mapping.json")
 
 
-def load_fixture_mapping(file_path: Optional[str] = None) -> Dict[str, Any]:
-    """Load and validate fixture mapping JSON.
+def load_fixture_mapping(file_path: str | None = None) -> dict[str, Any]:
+    """
+    Load and validate fixture mapping JSON.
 
     If `file_path` is omitted, the bundled `fixture_mapping.json` is used.
     Returns the parsed mapping dictionary.
@@ -44,7 +46,7 @@ def load_fixture_mapping(file_path: Optional[str] = None) -> Dict[str, Any]:
         raise HomeAssistantError(f"Fixture mapping file not found: {abs_path}")
 
     try:
-        with open(abs_path, "r", encoding="utf-8") as fh:
+        with open(abs_path, encoding="utf-8") as fh:
             data = json.load(fh)
     except json.JSONDecodeError as err:
         raise HomeAssistantError(f"Malformed JSON in fixture mapping file {abs_path}: {err}") from err
@@ -113,11 +115,12 @@ def _validate_fixture_mapping(data: Any) -> None:
                 )
 
 
-__all__ = ["load_fixture_mapping", "HomeAssistantError"]
+__all__ = ["HomeAssistantError", "load_fixture_mapping"]
 
 
 def clear_fixture_mapping_cache() -> None:
-    """Clear the internal fixture mapping cache.
+    """
+    Clear the internal fixture mapping cache.
 
     Useful for tests that need to force a reload of the mapping file.
     """

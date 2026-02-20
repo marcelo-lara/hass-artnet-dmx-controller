@@ -1,4 +1,5 @@
-"""Centralized DMX write helper (Phase 4).
+"""
+Centralized DMX write helper (Phase 4).
 
 Batches channel updates occurring in the same event-loop turn and forwards
 them to the underlying ArtNet helper via `set_channels` when available.
@@ -12,7 +13,8 @@ from .channel_math import clamp_dmx_value
 
 
 class DMXWriter:
-    """Batching writer that serializes and batches DMX writes.
+    """
+    Batching writer that serializes and batches DMX writes.
 
     This class accepts single-channel writes via `set_channel` and will batch
     multiple writes that happen in the same event-loop tick into a single

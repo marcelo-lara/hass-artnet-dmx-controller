@@ -2,7 +2,9 @@ import asyncio
 from types import SimpleNamespace
 
 import custom_components.artnet_dmx_controller.config_flow as cf_mod
-from custom_components.artnet_dmx_controller.config_flow import ArtNetDMXControllerConfigFlow
+from custom_components.artnet_dmx_controller.config_flow import (
+    ArtNetDMXControllerConfigFlow,
+)
 
 
 def _make_flow(mapping, existing_entries=None):

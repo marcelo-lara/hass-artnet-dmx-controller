@@ -1,17 +1,18 @@
-"""SceneStore for the ArtNet DMX Controller integration.
+"""
+SceneStore for the ArtNet DMX Controller integration.
 
 Persistent store key and implementation live under the integration
 `custom_components/artnet_dmx_controller/scene`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
 
 try:
-    from homeassistant.helpers.storage import Store
     from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.storage import Store
 except Exception:  # pragma: no cover - allow running tests outside HA
     Store = None
     HomeAssistant = object
@@ -26,7 +27,7 @@ class SceneStore:
     def __init__(self, hass: HomeAssistant):
         self.hass = hass
         self._store = None if Store is None else Store(hass, STORAGE_VERSION, STORAGE_KEY)
-        self._data: Dict[str, Any] = {}
+        self._data: dict[str, Any] = {}
 
     async def async_load(self) -> None:
         if self._store is None:
@@ -46,9 +47,9 @@ class SceneStore:
         payload = {"scenes": self._data}
         await self._store.async_save(payload)
 
-    async def async_capture(self, name: str, entities: Dict[str, Any]) -> None:
+    async def async_capture(self, name: str, entities: dict[str, Any]) -> None:
         # Use timezone-aware UTC timestamp
-        self._data[name] = {"name": name, "created_at": datetime.now(timezone.utc).isoformat(), "entities": entities}
+        self._data[name] = {"name": name, "created_at": datetime.now(UTC).isoformat(), "entities": entities}
         await self.async_save()
 
     async def async_apply(self, name: str, transition: int | None = None) -> None:
@@ -59,7 +60,7 @@ class SceneStore:
         # Minimal: apply by calling services on entities would be implemented here
         _LOGGER.debug("Would apply scene '%s' with %s entities", name, len(scene.get("entities", {})))
 
-    def async_list(self) -> Dict[str, Any]:
+    def async_list(self) -> dict[str, Any]:
         return self._data
 
     async def async_delete(self, name: str) -> None:

@@ -8,6 +8,7 @@ from typing import Any
 import voluptuous as vol
 from homeassistant import config_entries
 
+from .channel_math import absolute_channel
 from .const import (
     CONF_TARGET_IP,
     CONF_UNIVERSE,
@@ -15,8 +16,7 @@ from .const import (
     DOMAIN,
     MAX_UNIVERSE,
 )
-from .fixture_mapping import load_fixture_mapping, HomeAssistantError
-from .channel_math import absolute_channel
+from .fixture_mapping import HomeAssistantError, load_fixture_mapping
 
 
 class ArtNetDMXControllerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -60,16 +60,15 @@ class ArtNetDMXControllerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     # Validate fixture fields if provided
                     if fixture_type is None or start_channel is None:
                         errors["base"] = "missing_fixture"
+                    # Validate fixture_type is known
+                    elif mapping is None or fixture_type not in mapping.get("fixtures", {}):
+                        errors["base"] = "unknown_fixture_type"
                     else:
-                        # Validate fixture_type is known
-                        if mapping is None or fixture_type not in mapping.get("fixtures", {}):
-                            errors["base"] = "unknown_fixture_type"
-                        else:
-                            channel_count = mapping["fixtures"][fixture_type]["channel_count"]
-                            try:
-                                absolute_channel(start_channel, channel_count)
-                            except HomeAssistantError:
-                                errors["base"] = "invalid_channel_range"
+                        channel_count = mapping["fixtures"][fixture_type]["channel_count"]
+                        try:
+                            absolute_channel(start_channel, channel_count)
+                        except HomeAssistantError:
+                            errors["base"] = "invalid_channel_range"
 
                     # Check overlap with existing config entries that include start/channel_count
                     if not errors:

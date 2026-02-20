@@ -12,11 +12,14 @@ from homeassistant.components.light import (
 )
 from homeassistant.components.select import SelectEntity
 
+from .channel_math import (
+    absolute_channel,
+    clamp_dmx_value,
+    value_from_label,
+)
 from .const import DEFAULT_CHANNEL_COUNT, DOMAIN, LOGGER
-from .fixture_mapping import load_fixture_mapping, HomeAssistantError
-from .channel_math import absolute_channel
-from .channel_math import value_from_label, label_from_value, clamp_dmx_value
 from .dmx_writer import DMXWriter
+from .fixture_mapping import HomeAssistantError, load_fixture_mapping
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -320,7 +323,7 @@ class ArtNetDMXRGBLight(LightEntity):
 
     def __init__(
         self,
-        artnet_helper: "ArtNetDMXHelper",
+        artnet_helper: ArtNetDMXHelper,
         red_channel: int,
         green_channel: int,
         blue_channel: int,
@@ -363,10 +366,9 @@ class ArtNetDMXRGBLight(LightEntity):
 
         if brightness is not None:
             self._brightness = clamp_dmx_value(int(brightness))
-        else:
-            # default full
-            if self._brightness == 0:
-                self._brightness = 255
+        # default full
+        elif self._brightness == 0:
+            self._brightness = 255
 
         if rgb is not None:
             self._rgb = tuple(int(c) for c in rgb)

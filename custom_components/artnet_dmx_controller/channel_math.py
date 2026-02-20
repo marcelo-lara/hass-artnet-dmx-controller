@@ -1,4 +1,5 @@
-"""DMX channel math and value helpers.
+"""
+DMX channel math and value helpers.
 
 Central helpers for computing absolute DMX channel addresses and validating
 DMX channel/value ranges. Designed to be used by entity write paths and scene
@@ -6,8 +7,7 @@ apply logic.
 """
 from __future__ import annotations
 
-import os
-from typing import Any, Dict, Optional
+from typing import Any
 
 try:
     from homeassistant.exceptions import HomeAssistantError
@@ -23,7 +23,8 @@ DMX_VALUE_MAX = 255
 
 
 def absolute_channel(start_channel: int, offset: int) -> int:
-    """Return absolute DMX channel for a fixture starting at `start_channel`.
+    """
+    Return absolute DMX channel for a fixture starting at `start_channel`.
 
     Calculation: absolute = start_channel + offset - 1
     Raises HomeAssistantError if result is outside 1..512.
@@ -37,7 +38,8 @@ def absolute_channel(start_channel: int, offset: int) -> int:
 
 
 def validate_dmx_value(value: int) -> int:
-    """Validate a DMX channel value is in 0..255 and return it.
+    """
+    Validate a DMX channel value is in 0..255 and return it.
 
     Raises HomeAssistantError on invalid input.
     """
@@ -61,8 +63,9 @@ def clamp_dmx_value(value: int) -> int:
     return iv
 
 
-def value_from_label(value_map: Dict[Any, Any], label: str) -> int:
-    """Given a mapping of numeric/string keys to labels, return the numeric value for `label`.
+def value_from_label(value_map: dict[Any, Any], label: str) -> int:
+    """
+    Given a mapping of numeric/string keys to labels, return the numeric value for `label`.
 
     Example mapping in JSON: {"0": "Off", "255": "On"}
     Returns int key corresponding to the given label, raises HomeAssistantError if not found.
@@ -76,7 +79,7 @@ def value_from_label(value_map: Dict[Any, Any], label: str) -> int:
     raise HomeAssistantError(f"Label '{label}' not found in value_map")
 
 
-def label_from_value(value_map: Dict[Any, Any], value: int) -> Optional[str]:
+def label_from_value(value_map: dict[Any, Any], value: int) -> str | None:
     """Return label for numeric `value` if present in `value_map`, else None."""
     sval = str(value)
     if sval in value_map:
@@ -93,8 +96,8 @@ def label_from_value(value_map: Dict[Any, Any], value: int) -> Optional[str]:
 
 __all__ = [
     "absolute_channel",
-    "validate_dmx_value",
     "clamp_dmx_value",
-    "value_from_label",
     "label_from_value",
+    "validate_dmx_value",
+    "value_from_label",
 ]

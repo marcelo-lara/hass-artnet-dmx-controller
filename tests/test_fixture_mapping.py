@@ -1,11 +1,13 @@
 import json
-import os
 import tempfile
+from pathlib import Path
+
+import pytest
 
 from custom_components.artnet_dmx_controller.fixture_mapping import (
-    load_fixture_mapping,
     HomeAssistantError,
     clear_fixture_mapping_cache,
+    load_fixture_mapping,
 )
 
 
@@ -37,7 +39,7 @@ def test_valid_mapping_loads():
         assert "test_fixture" in mapping["fixtures"]
         assert mapping["fixtures"]["test_fixture"]["channel_count"] == 2
     finally:
-        os.remove(path)
+        Path(path).unlink()
 
 
 def test_missing_file_raises():
@@ -52,11 +54,11 @@ def test_malformed_json_raises():
     try:
         try:
             load_fixture_mapping(path)
-            assert False, "Expected HomeAssistantError for malformed json"
+            pytest.fail("Expected HomeAssistantError for malformed json")
         except HomeAssistantError as err:
             assert "malformed json" in str(err).lower()
     finally:
-        os.remove(path)
+        Path(path).unlink()
 
 
 def test_missing_required_keys_raises():
@@ -65,11 +67,11 @@ def test_missing_required_keys_raises():
     try:
         try:
             load_fixture_mapping(path)
-            assert False, "Expected HomeAssistantError for missing keys"
+            pytest.fail("Expected HomeAssistantError for missing keys")
         except HomeAssistantError as err:
             assert "missing required 'channel_count'" in str(err).lower()
     finally:
-        os.remove(path)
+        Path(path).unlink()
 
 
 def test_top_level_not_object_raises():
@@ -77,11 +79,11 @@ def test_top_level_not_object_raises():
     try:
         try:
             load_fixture_mapping(path)
-            assert False, "Expected HomeAssistantError for top-level non-object"
+            pytest.fail("Expected HomeAssistantError for top-level non-object")
         except HomeAssistantError as err:
             assert "must be a json object" in str(err).lower()
     finally:
-        os.remove(path)
+        Path(path).unlink()
 
 
 def test_invalid_fixtures_type_raises():
@@ -90,11 +92,11 @@ def test_invalid_fixtures_type_raises():
     try:
         try:
             load_fixture_mapping(path)
-            assert False, "Expected HomeAssistantError for invalid fixtures type"
+            pytest.fail("Expected HomeAssistantError for invalid fixtures type")
         except HomeAssistantError as err:
             assert "missing or invalid 'fixtures' object" in str(err).lower()
     finally:
-        os.remove(path)
+        Path(path).unlink()
 
 
 def test_fixture_definition_not_object_raises():
@@ -103,11 +105,11 @@ def test_fixture_definition_not_object_raises():
     try:
         try:
             load_fixture_mapping(path)
-            assert False, "Expected HomeAssistantError for fixture definition not object"
+            pytest.fail("Expected HomeAssistantError for fixture definition not object")
         except HomeAssistantError as err:
             assert "definition must be an object" in str(err).lower()
     finally:
-        os.remove(path)
+        Path(path).unlink()
 
 
 def test_missing_fixture_specie_raises():
@@ -116,11 +118,11 @@ def test_missing_fixture_specie_raises():
     try:
         try:
             load_fixture_mapping(path)
-            assert False, "Expected HomeAssistantError for missing fixture_specie"
+            pytest.fail("Expected HomeAssistantError for missing fixture_specie")
         except HomeAssistantError as err:
             assert "missing required 'fixture_specie'" in str(err).lower()
     finally:
-        os.remove(path)
+        Path(path).unlink()
 
 
 def test_invalid_channel_count_raises():
@@ -130,11 +132,11 @@ def test_invalid_channel_count_raises():
     try:
         try:
             load_fixture_mapping(path)
-            assert False, "Expected HomeAssistantError for invalid channel_count"
+            pytest.fail("Expected HomeAssistantError for invalid channel_count")
         except HomeAssistantError as err:
             assert "invalid 'channel_count'" in str(err).lower()
     finally:
-        os.remove(path)
+        Path(path).unlink()
 
 
 def test_missing_channels_raises():
@@ -143,11 +145,11 @@ def test_missing_channels_raises():
     try:
         try:
             load_fixture_mapping(path)
-            assert False, "Expected HomeAssistantError for missing channels"
+            pytest.fail("Expected HomeAssistantError for missing channels")
         except HomeAssistantError as err:
             assert "missing required 'channels'" in str(err).lower()
     finally:
-        os.remove(path)
+        Path(path).unlink()
 
 
 def test_channels_not_array_raises():
@@ -156,11 +158,11 @@ def test_channels_not_array_raises():
     try:
         try:
             load_fixture_mapping(path)
-            assert False, "Expected HomeAssistantError for channels not array"
+            pytest.fail("Expected HomeAssistantError for channels not array")
         except HomeAssistantError as err:
             assert "'channels' must be an array" in str(err).lower()
     finally:
-        os.remove(path)
+        Path(path).unlink()
 
 
 def test_channel_not_object_raises():
@@ -173,11 +175,11 @@ def test_channel_not_object_raises():
     try:
         try:
             load_fixture_mapping(path)
-            assert False, "Expected HomeAssistantError for channel not object"
+            pytest.fail("Expected HomeAssistantError for channel not object")
         except HomeAssistantError as err:
             assert "channel at index 0 must be an object" in str(err).lower()
     finally:
-        os.remove(path)
+        Path(path).unlink()
 
 
 def test_channel_missing_required_field_raises():
@@ -194,11 +196,11 @@ def test_channel_missing_required_field_raises():
     try:
         try:
             load_fixture_mapping(path)
-            assert False, "Expected HomeAssistantError for channel missing name"
+            pytest.fail("Expected HomeAssistantError for channel missing name")
         except HomeAssistantError as err:
             assert "missing required 'name'" in str(err).lower()
     finally:
-        os.remove(path)
+        Path(path).unlink()
 
 
 def test_channel_invalid_offset_raises():
@@ -215,11 +217,11 @@ def test_channel_invalid_offset_raises():
     try:
         try:
             load_fixture_mapping(path)
-            assert False, "Expected HomeAssistantError for invalid offset"
+            pytest.fail("Expected HomeAssistantError for invalid offset")
         except HomeAssistantError as err:
             assert "has invalid offset" in str(err).lower()
     finally:
-        os.remove(path)
+        Path(path).unlink()
 
 
 def test_duplicate_channel_offset_raises():
@@ -239,11 +241,11 @@ def test_duplicate_channel_offset_raises():
     try:
         try:
             load_fixture_mapping(path)
-            assert False, "Expected HomeAssistantError for duplicate offset"
+            pytest.fail("Expected HomeAssistantError for duplicate offset")
         except HomeAssistantError as err:
             assert "duplicate channel offset" in str(err).lower()
     finally:
-        os.remove(path)
+        Path(path).unlink()
 
 
 def test_value_map_not_object_raises():
@@ -262,11 +264,11 @@ def test_value_map_not_object_raises():
     try:
         try:
             load_fixture_mapping(path)
-            assert False, "Expected HomeAssistantError for non-object value_map"
+            pytest.fail("Expected HomeAssistantError for non-object value_map")
         except HomeAssistantError as err:
             assert "'value_map' must be an object" in str(err).lower()
     finally:
-        os.remove(path)
+        Path(path).unlink()
 
 
 def test_hidden_by_default_not_boolean_raises():
@@ -285,11 +287,11 @@ def test_hidden_by_default_not_boolean_raises():
     try:
         try:
             load_fixture_mapping(path)
-            assert False, "Expected HomeAssistantError for non-boolean hidden_by_default"
+            pytest.fail("Expected HomeAssistantError for non-boolean hidden_by_default")
         except HomeAssistantError as err:
             assert "'hidden_by_default' must be boolean" in str(err).lower()
     finally:
-        os.remove(path)
+        Path(path).unlink()
 
 
 def test_load_uses_cache():
@@ -319,7 +321,7 @@ def test_load_uses_cache():
         assert "one" in m1["fixtures"]
 
         # overwrite file with data_b
-        with open(path, "w", encoding="utf-8") as fh:
+        with Path(path).open("w", encoding="utf-8") as fh:
             fh.write(json.dumps(data_b))
 
         # without clearing cache, loader should still return cached mapping
@@ -332,4 +334,4 @@ def test_load_uses_cache():
         assert "two" in m3["fixtures"] and "one" not in m3["fixtures"]
     finally:
         clear_fixture_mapping_cache()
-        os.remove(path)
+        Path(path).unlink()

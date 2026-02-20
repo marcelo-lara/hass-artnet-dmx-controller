@@ -5,7 +5,8 @@ from custom_components.artnet_dmx_controller.light import async_setup_entry
 
 
 def test_hidden_by_default_sets_entity_registry_enabled_default():
-    """Entities for channels with hidden_by_default=True should be disabled by default.
+    """
+    Entities for channels with hidden_by_default=True should be disabled by default.
 
     This test monkeypatches the mapping used by the light setup by providing an
     inline mapping via the `fixture_type` referenced by the test entry.
@@ -60,7 +61,7 @@ def test_hidden_by_default_sets_entity_registry_enabled_default():
     assert len(added) == 3
 
     # Map names to enabled_default flag
-    name_to_enabled = {getattr(e, "_attr_name"): getattr(e, "_attr_entity_registry_enabled_default", True) for e in added}
+    name_to_enabled = {e._attr_name: getattr(e, "_attr_entity_registry_enabled_default", True) for e in added}
 
     # Channel 1 (dim) should be enabled by default
     assert any("dim" in n and v for n, v in name_to_enabled.items())

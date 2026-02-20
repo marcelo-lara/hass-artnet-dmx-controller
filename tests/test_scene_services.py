@@ -1,10 +1,12 @@
 import asyncio
-
 from types import SimpleNamespace
 
-from custom_components.artnet_dmx_controller.scene_services import async_record_scene, async_play_scene
-from custom_components.artnet_dmx_controller.scene.scene_store import SceneStore
 from custom_components.artnet_dmx_controller.const import DOMAIN
+from custom_components.artnet_dmx_controller.scene.scene_store import SceneStore
+from custom_components.artnet_dmx_controller.scene_services import (
+    async_play_scene,
+    async_record_scene,
+)
 
 
 def test_record_and_play_scene():

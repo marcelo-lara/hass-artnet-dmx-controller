@@ -2,8 +2,6 @@ import asyncio
 import importlib
 from types import SimpleNamespace
 
-import pytest
-
 integration_init = importlib.import_module("custom_components.artnet_dmx_controller")
 from custom_components.artnet_dmx_controller.const import DOMAIN
 
@@ -70,7 +68,7 @@ def test_delete_scene_service_removes_scene():
     assert "tosave" in store.async_list()
 
     # call the registered delete handler
-    delete_reg = [r for r in regs if r[1] == "delete_scene"][0]
+    delete_reg = next(r for r in regs if r[1] == "delete_scene")
     # handler is at index 2
     handler = delete_reg[2]
     # Call handler with a fake service call
@@ -78,4 +76,4 @@ def test_delete_scene_service_removes_scene():
     call.data = {"name": "tosave"}
     asyncio.run(handler(call))
 
-    assert "tosave" not in store.async_list()
+    assert "tosave" not in store.async_list()  # noqa: S101

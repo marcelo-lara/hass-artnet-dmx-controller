@@ -1,4 +1,5 @@
-"""Scene recording and playback helpers for ArtNet DMX Controller.
+"""
+Scene recording and playback helpers for ArtNet DMX Controller.
 
 This module provides small functions to record the current DMX buffer into
 the shared `SceneStore` and to play back a stored scene by writing DMX

@@ -1,7 +1,5 @@
 import asyncio
 
-import pytest
-
 
 def test_batching_with_set_channels():
     async def _run():
