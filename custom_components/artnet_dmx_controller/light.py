@@ -267,6 +267,7 @@ class ArtNetDMXLight(LightEntity):
             "identifiers": {(DOMAIN, entry_id)},
             "name": fixture_label or f"{entry_id} Fixture",
         }
+        self._attr_icon = "mdi:lightbulb"
         self._is_on = False
         self._brightness = 0
 
@@ -358,6 +359,7 @@ class ArtNetDMXSelect(SelectEntity):
             "identifiers": {(DOMAIN, entry_id)},
             "name": fixture_label or f"{entry_id} Fixture",
         }
+        self._attr_icon = "mdi:format-list-bulleted"
 
     @property
     def options(self) -> list[str]:
@@ -424,6 +426,7 @@ class ArtNetDMXRGBLight(LightEntity):
         else:
             self._attr_name = f"DMX RGB {self._red}"
         self._attr_device_info = {"identifiers": {(DOMAIN, entry_id)}, "name": fixture_label or f"{entry_id} Fixture"}
+        self._attr_icon = "mdi:led-strip-variant"
         self._is_on = False
         self._brightness = 0
         self._rgb = (0, 0, 0)
@@ -541,6 +544,7 @@ class ArtNetDMX16BitLight(LightEntity):
             self._attr_name = f"DMX 16-bit {self._msb}"
         self._attr_entity_registry_enabled_default = not bool(hidden_by_default)
         self._attr_device_info = {"identifiers": {(DOMAIN, entry_id)}, "name": fixture_label or f"{entry_id} Fixture"}
+        self._attr_icon = "mdi:lightbulb"
         self._is_on = False
         self._brightness = 0
 

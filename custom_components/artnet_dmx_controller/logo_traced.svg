@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect width="128" height="128" fill="#000" />
+
+  <!-- Outer rounded box -->
+  <rect x="8" y="22" width="112" height="84" rx="6" ry="6" fill="none" stroke="#ffffff" stroke-width="3" />
+
+  <!-- Top knobs -->
+  <g fill="#ffffff">
+    <circle cx="28" cy="34" r="6" />
+    <circle cx="48" cy="34" r="6" />
+    <circle cx="68" cy="34" r="6" />
+    <circle cx="88" cy="34" r="6" />
+  </g>
+
+  <!-- DMX label (blue rounded rect) -->
+  <rect x="12" y="44" width="22" height="14" rx="3" ry="3" fill="#0a84ff" />
+
+  <!-- Sliders -->
+  <g fill="#ffffff">
+    <rect x="44" y="54" width="4" height="30" />
+    <rect x="56" y="50" width="4" height="34" />
+    <rect x="68" y="58" width="4" height="26" />
+  </g>
+
+  <!-- Joystick base and stick -->
+  <g stroke="#ffffff" stroke-width="3" fill="none">
+    <circle cx="98" cy="58" r="8" />
+    <line x1="98" y1="66" x2="98" y2="78" />
+  </g>
+
+  <!-- Blue indicator LEDs -->
+  <g fill="#0096ff">
+    <circle cx="94" cy="86" r="4" />
+    <circle cx="106" cy="86" r="4" />
+    <circle cx="94" cy="98" r="4" />
+    <circle cx="106" cy="98" r="4" />
+  </g>
+</svg>
