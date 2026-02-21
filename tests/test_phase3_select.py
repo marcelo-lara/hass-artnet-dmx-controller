@@ -2,7 +2,7 @@ import asyncio
 import importlib
 from types import SimpleNamespace
 
-from custom_components.artnet_dmx_controller.light import async_setup_entry
+from custom_components.artnet_dmx_controller import select as select_mod
 
 
 def test_select_entity_value_map_and_send():
@@ -40,10 +40,10 @@ def test_select_entity_value_map_and_send():
         }
     }
 
-    # Monkeypatch loader
-    light_mod = importlib.import_module("custom_components.artnet_dmx_controller.light")
-    orig_loader = light_mod.load_fixture_mapping
-    light_mod.load_fixture_mapping = lambda: mapping
+    # Monkeypatch loader on select module
+    sel_mod = importlib.import_module("custom_components.artnet_dmx_controller.select")
+    orig_loader = sel_mod.load_fixture_mapping
+    sel_mod.load_fixture_mapping = lambda: mapping
 
     try:
         entry = SimpleNamespace(entry_id=entry_id, data={"fixture_type": "vm", "start_channel": 20, "channel_count": 1})
@@ -53,11 +53,11 @@ def test_select_entity_value_map_and_send():
         def async_add_entities(entities):
             added.extend(entities)
 
-        asyncio.run(async_setup_entry(hass, entry, async_add_entities))
+        asyncio.run(select_mod.async_setup_entry(hass, entry, async_add_entities))
 
     finally:
         # restore loader
-        light_mod.load_fixture_mapping = orig_loader
+        sel_mod.load_fixture_mapping = orig_loader
 
     # find the select entity (has options)
     select_entities = [e for e in added if hasattr(e, "options")]

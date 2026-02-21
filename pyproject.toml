@@ -4,14 +4,4 @@ select = ["E", "F", "W", "C", "Q", "B", "S", "D", "ANN", "PT", "PLR", "PTH", "RU
 
 # Many tests intentionally use simple asserts and lack docstrings/type-annotations.
 # Relax a set of rules for tests to keep focus on integration code quality.
-per-file-ignores = {
-  "tests/*" = [
-    "S101",  # use of assert in tests is acceptable
-    "D100", "D101", "D102", "D103",  # docstring rules
-    "ANN201", "ANN204", "ANN202", "ANN001", "ANN203", "ANN200",  # type annotation rules
-    "E501",  # long lines in tests are acceptable
-    "PTH107",  # allow os.remove in tests
-    "PT015", "PT017", "PT018",  # pytest-specific assertion patterns
-    "PLR2004",  # magic numbers in tests are acceptable
-  ]
-}
+per-file-ignores = { "tests/*" = ["S101", "D100", "D101", "D102", "D103", "ANN201", "ANN204", "ANN202", "ANN001", "ANN203", "ANN200", "E501", "PTH107", "PT015", "PT017", "PT018", "PLR2004"] }

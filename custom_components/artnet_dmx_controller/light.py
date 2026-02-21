@@ -322,69 +322,7 @@ class ArtNetDMXLight(LightEntity):
 
 
 
-class ArtNetDMXSelect(SelectEntity):
-    """Select entity for DMX channels with discrete value maps."""
 
-    _attr_has_entity_name = True
-
-    def __init__(
-        self,
-        artnet_helper: ArtNetDMXHelper,
-        channel: int,
-        entry_id: str,
-        channel_name: str | None = None,
-        value_map: dict | None = None,
-        hidden_by_default: bool = False,
-        dmx_writer: DMXWriter | None = None,
-        fixture_label: str | None = None,
-    ) -> None:
-        self._artnet_helper = artnet_helper
-        self._dmx_writer = dmx_writer
-        self._channel = channel
-        self._value_map = value_map or {}
-        self._attr_unique_id = f"{entry_id}_channel_{channel}"
-        human_label = _humanize(fixture_label) or fixture_label
-        human_channel = _humanize(channel_name) or channel_name
-        if human_label and human_channel:
-            self._attr_name = f"{human_label} {human_channel}"
-        elif human_label:
-            self._attr_name = f"{human_label} Channel {channel}"
-        elif human_channel:
-            self._attr_name = f"DMX Channel {channel} {human_channel}"
-        else:
-            self._attr_name = f"DMX Channel {channel}"
-        self._attr_entity_registry_enabled_default = not bool(hidden_by_default)
-        self._current = None
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, entry_id)},
-            "name": fixture_label or f"{entry_id} Fixture",
-        }
-        self._attr_icon = "mdi:format-list-bulleted"
-
-    @property
-    def options(self) -> list[str]:
-        return list(self._value_map.values())
-
-    @property
-    def current_option(self) -> str | None:
-        return self._current
-
-    async def async_select_option(self, option: str) -> None:
-        try:
-            value = value_from_label(self._value_map, option)
-            value = clamp_dmx_value(value)
-        except Exception:
-            return
-        if self._dmx_writer is not None:
-            await self._dmx_writer.set_channel(self._channel, int(value))
-        else:
-            await self._artnet_helper.set_channel(self._channel, int(value))
-        self._current = option
-        try:
-            self.async_write_ha_state()
-        except RuntimeError:
-            # In tests the entity may not be registered with hass; ignore
-            pass
 
 
 
