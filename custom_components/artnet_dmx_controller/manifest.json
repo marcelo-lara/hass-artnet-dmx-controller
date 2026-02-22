@@ -1,6 +1,7 @@
 {
   "domain": "artnet_dmx_controller",
   "name": "ArtNet DMX Controller",
+  "logo": "logo.svg",
   "codeowners": [
     "@marcelo-lara"
   ],
