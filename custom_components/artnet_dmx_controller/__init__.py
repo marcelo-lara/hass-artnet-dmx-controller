@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 import voluptuous as vol
 from homeassistant.const import Platform
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import device_registry as dr
 
 from .artnet import ArtNetDMXHelper
 from .const import CONF_TARGET_IP, CONF_UNIVERSE, DOMAIN, LOGGER
@@ -30,6 +31,7 @@ if TYPE_CHECKING:
 
 PLATFORMS: list[Platform] = [
     Platform.LIGHT,
+    Platform.SELECT,
 ]
 
 
@@ -54,6 +56,25 @@ async def async_setup_entry(
     # Store the helper in hass.data
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = artnet_helper
+
+    # Create/update a device registry entry so the integration appears under Devices
+    # even if entities are disabled or not yet added.
+    try:
+        fixture_type = entry.data.get("fixture_type")
+        device_name = (
+            entry.data.get("name")
+            or getattr(entry, "title", None)
+            or f"ArtNet DMX ({target_ip} U:{universe})"
+        )
+        dr.async_get(hass).async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, entry.entry_id)},
+            manufacturer="Art-Net",
+            model=fixture_type or "DMX Controller",
+            name=device_name,
+        )
+    except Exception:  # pragma: no cover - best effort for non-HA/unit-test stubs
+        LOGGER.debug("Could not register device for entry %s", entry.entry_id, exc_info=True)
 
     # Initialize shared SceneStore and register services once
     scene_key = f"{DOMAIN}_scene_store"

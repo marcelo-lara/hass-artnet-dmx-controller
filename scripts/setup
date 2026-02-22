@@ -1,7 +1,18 @@
 #!/usr/bin/env bash
-
 set -e
 
+# Move to the repository root
 cd "$(dirname "$0")/.."
 
+# 1. Install your specific requirements
 python3 -m pip install --requirement requirements.txt
+
+# 2. Add Home Assistant and testing tools (Required for E2E)
+python3 -m pip install homeassistant pytest-homeassistant-custom-component
+
+# 3. Link your component to a test config folder
+# This 'tricks' HA into seeing your local code as an installed integration
+mkdir -p config/custom_components
+ln -s "$(pwd)/custom_components/artnet_dmx" "$(pwd)/config/custom_components/artnet_dmx"
+
+echo "Setup complete. You can now run 'hass -c config' to start testing."

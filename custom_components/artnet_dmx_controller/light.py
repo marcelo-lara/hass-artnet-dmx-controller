@@ -10,12 +10,11 @@ from homeassistant.components.light import (
     ColorMode,
     LightEntity,
 )
-from homeassistant.components.select import SelectEntity
+from homeassistant.helpers.device_registry import DeviceInfo
 
 from .channel_math import (
     absolute_channel,
     clamp_dmx_value,
-    value_from_label,
 )
 from typing import Optional
 
@@ -170,32 +169,22 @@ async def async_setup_entry(
                     name = ch.get("name")
                     hidden = bool(ch.get("hidden_by_default", False))
                     abs_channel = absolute_channel(int(start_channel), int(offset))
-                    # If channel has a value_map, create a Select entity
+                    # Select channels are created in select.py; keep light.py limited
+                    # to light entities to avoid cross-platform duplication/conflicts.
                     if "value_map" in ch:
-                        entities.append(
-                            ArtNetDMXSelect(
-                                artnet_helper=artnet_helper,
-                                dmx_writer=dmx_writer,
-                                channel=abs_channel,
-                                entry_id=entry.entry_id,
-                                channel_name=name,
-                                value_map=ch.get("value_map", {}),
-                                hidden_by_default=hidden,
-                                fixture_label=fixture_label,
-                            )
+                        continue
+
+                    entities.append(
+                        ArtNetDMXLight(
+                            artnet_helper=artnet_helper,
+                            dmx_writer=dmx_writer,
+                            channel=abs_channel,
+                            entry_id=entry.entry_id,
+                            channel_name=name,
+                            hidden_by_default=hidden,
+                            fixture_label=fixture_label,
                         )
-                    else:
-                        entities.append(
-                            ArtNetDMXLight(
-                                artnet_helper=artnet_helper,
-                                dmx_writer=dmx_writer,
-                                channel=abs_channel,
-                                entry_id=entry.entry_id,
-                                channel_name=name,
-                                hidden_by_default=hidden,
-                                fixture_label=fixture_label,
-                            )
-                        )
+                    )
         except HomeAssistantError:
             # Fallback to default behavior below
             LOGGER.exception("Failed to load fixture mapping; falling back to default channels")
@@ -263,10 +252,10 @@ class ArtNetDMXLight(LightEntity):
         # Allow mapping to request the channel be disabled by default in the entity registry
         self._attr_entity_registry_enabled_default = not bool(hidden_by_default)
         # Device grouping information: associate entities for the same config entry (fixture)
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, entry_id)},
-            "name": fixture_label or f"{entry_id} Fixture",
-        }
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry_id)},
+            name=fixture_label or f"{entry_id} Fixture",
+        )
         self._attr_icon = "mdi:lightbulb"
         self._is_on = False
         self._brightness = 0
@@ -363,7 +352,10 @@ class ArtNetDMXRGBLight(LightEntity):
             self._attr_name = f"{human_channel}"
         else:
             self._attr_name = f"DMX RGB {self._red}"
-        self._attr_device_info = {"identifiers": {(DOMAIN, entry_id)}, "name": fixture_label or f"{entry_id} Fixture"}
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry_id)},
+            name=fixture_label or f"{entry_id} Fixture",
+        )
         self._attr_icon = "mdi:led-strip-variant"
         self._is_on = False
         self._brightness = 0
@@ -481,7 +473,10 @@ class ArtNetDMX16BitLight(LightEntity):
         else:
             self._attr_name = f"DMX 16-bit {self._msb}"
         self._attr_entity_registry_enabled_default = not bool(hidden_by_default)
-        self._attr_device_info = {"identifiers": {(DOMAIN, entry_id)}, "name": fixture_label or f"{entry_id} Fixture"}
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry_id)},
+            name=fixture_label or f"{entry_id} Fixture",
+        )
         self._attr_icon = "mdi:lightbulb"
         self._is_on = False
         self._brightness = 0

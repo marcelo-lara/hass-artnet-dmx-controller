@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, TYPE_CHECKING
 
 from homeassistant.components.select import SelectEntity
+from homeassistant.helpers.device_registry import DeviceInfo
 
 from .channel_math import clamp_dmx_value, value_from_label
 from .const import DOMAIN, LOGGER
@@ -105,10 +106,10 @@ class ArtNetDMXSelect(SelectEntity):
         self._attr_entity_registry_enabled_default = not bool(hidden_by_default)
         self._current = None
         self._is_on = False
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, entry_id)},
-            "name": fixture_label or f"{entry_id} Fixture",
-        }
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry_id)},
+            name=fixture_label or f"{entry_id} Fixture",
+        )
         self._attr_icon = "mdi:format-list-bulleted"
 
     @property
