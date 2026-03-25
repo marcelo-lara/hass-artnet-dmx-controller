@@ -1,6 +1,8 @@
 import asyncio
 from types import SimpleNamespace
 
+from homeassistant.helpers.entity import EntityCategory
+
 from custom_components.artnet_dmx_controller.number import async_setup_entry
 
 
@@ -22,7 +24,7 @@ class DummyArtNetHelper:
         return self._dmx_data[channel - 1]
 
 
-def test_async_setup_entry_creates_pan_tilt_number_entities():
+def test_async_setup_entry_creates_configuration_number_entities():
     hass = SimpleNamespace()
     hass.data = {}
 
@@ -50,8 +52,17 @@ def test_async_setup_entry_creates_pan_tilt_number_entities():
 
     asyncio.run(async_setup_entry(hass, entry, async_add_entities))
 
-    assert len(added) == 2
-    assert {entity._attr_name for entity in added} == {"Mini Beam Prism Pan", "Mini Beam Prism Tilt"}
+    assert len(added) == 7
+    assert {entity._attr_name for entity in added} == {
+        "Mini Beam Prism Pan",
+        "Mini Beam Prism Tilt",
+        "Mini Beam Prism Speed",
+        "Mini Beam Prism Strobe",
+        "Mini Beam Prism Prism",
+        "Mini Beam Prism Autoplay",
+        "Mini Beam Prism Reset",
+    }
+    assert all(entity.entity_category == EntityCategory.CONFIG for entity in added)
 
 
 def test_pan_tilt_number_sends_split_16bit_value():

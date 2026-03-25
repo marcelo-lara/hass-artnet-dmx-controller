@@ -50,10 +50,10 @@ def test_async_setup_entry_creates_fixture_entities():
 
     asyncio.run(async_setup_entry(hass, entry, async_add_entities))
 
-    assert len(added) == 2
+    assert len(added) == 1
     rgb_entities = [entity for entity in added if hasattr(entity, "_red") and hasattr(entity, "_green")]
     assert len(rgb_entities) == 1
-    assert len({entity._attr_unique_id for entity in added}) == 2
+    assert len({entity._attr_unique_id for entity in added}) == 1
 
 
 def test_async_setup_entry_skips_value_map_channels_in_light_platform():
@@ -84,5 +84,6 @@ def test_async_setup_entry_skips_value_map_channels_in_light_platform():
 
     asyncio.run(async_setup_entry(hass, entry, async_add_entities))
 
-    assert len(added) == 6
+    assert len(added) == 1
     assert all(entity.__class__.__name__ != "ArtNetDMXSelect" for entity in added)
+    assert added[0]._attr_name.endswith("Dim")

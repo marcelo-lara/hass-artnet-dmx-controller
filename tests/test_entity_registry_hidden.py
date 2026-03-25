@@ -1,7 +1,7 @@
 import asyncio
 from types import SimpleNamespace
 
-from custom_components.artnet_dmx_controller.light import async_setup_entry
+from custom_components.artnet_dmx_controller.number import async_setup_entry
 
 
 def test_hidden_by_default_sets_entity_registry_enabled_default():
@@ -25,6 +25,7 @@ def test_hidden_by_default_sets_entity_registry_enabled_default():
     mapping = {
         "fixtures": {
             "mix": {
+                "fixture_specie": "moving_head",
                 "channel_count": 3,
                 "channels": [
                     {"name": "dim", "offset": 1, "description": "d", "hidden_by_default": False},
@@ -37,9 +38,9 @@ def test_hidden_by_default_sets_entity_registry_enabled_default():
 
     import importlib
 
-    light_mod = importlib.import_module("custom_components.artnet_dmx_controller.light")
-    orig_loader = light_mod.load_fixture_mapping
-    light_mod.load_fixture_mapping = lambda: mapping
+    number_mod = importlib.import_module("custom_components.artnet_dmx_controller.number")
+    orig_loader = number_mod.load_fixture_mapping
+    number_mod.load_fixture_mapping = lambda: mapping
 
     try:
         entry = SimpleNamespace(
@@ -61,9 +62,9 @@ def test_hidden_by_default_sets_entity_registry_enabled_default():
 
         asyncio.run(async_setup_entry(hass, entry, async_add_entities))
     finally:
-        light_mod.load_fixture_mapping = orig_loader
+        number_mod.load_fixture_mapping = orig_loader
 
-    assert len(added) == 3
+    assert len(added) == 2
     name_to_enabled = {entity._attr_name: getattr(entity, "_attr_entity_registry_enabled_default", True) for entity in added}
-    assert any("dim" in name.lower() and enabled for name, enabled in name_to_enabled.items())
     assert any("prog" in name.lower() and not enabled for name, enabled in name_to_enabled.items())
+    assert any("strobe" in name.lower() and enabled for name, enabled in name_to_enabled.items())

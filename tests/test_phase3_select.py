@@ -2,6 +2,8 @@ import asyncio
 import importlib
 from types import SimpleNamespace
 
+from homeassistant.helpers.entity import EntityCategory
+
 from custom_components.artnet_dmx_controller import select as select_mod
 
 
@@ -70,6 +72,7 @@ def test_select_entity_value_map_and_send():
     entity = select_entities[0]
     assert set(entity.options) == {"White", "Red", "Blue"}
     assert entity.current_option == "White"
+    assert entity.entity_category == EntityCategory.CONFIG
 
     asyncio.run(entity.async_select_option("Red"))
     assert sent == [(20, 10)]

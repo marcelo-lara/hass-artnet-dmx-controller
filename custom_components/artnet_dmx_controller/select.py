@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity import EntityCategory
 
 from .channel_math import clamp_dmx_value, label_from_value, value_from_label
 from .const import CONF_FIXTURE_ID, CONF_FIXTURE_TYPE, CONF_NAME, CONF_START_CHANNEL, DOMAIN, LOGGER
@@ -113,6 +114,7 @@ class ArtNetDMXSelect(SelectEntity):
         else:
             self._attr_name = f"DMX Channel {channel}"
         self._attr_entity_registry_enabled_default = not bool(hidden_by_default)
+        self._attr_entity_category = EntityCategory.CONFIG
         current_value = _channel_value(artnet_helper, channel)
         current_label = label_from_value(self._value_map, current_value)
         self._synthetic_options: dict[str, int] = {}

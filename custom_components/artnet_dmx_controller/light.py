@@ -58,6 +58,7 @@ async def async_setup_entry(
             or entry.entry_id
         )
         channels = fixture_def.get("channels", [])
+        fixture_specie = fixture_def.get("fixture_specie")
         name_map = {channel.get("name"): channel for channel in channels}
 
         rgb_group = None
@@ -83,7 +84,7 @@ async def async_setup_entry(
         for msb_offset, lsb_offset in bit16_pairs.values():
             handled_offsets.update({msb_offset, lsb_offset})
 
-        if rgb_group is not None:
+        if fixture_specie == "parcan" and rgb_group is not None:
             handled_offsets.update({rgb_group["red"], rgb_group["green"], rgb_group["blue"]})
             if rgb_group["dim"] is not None:
                 handled_offsets.add(rgb_group["dim"])
@@ -105,19 +106,17 @@ async def async_setup_entry(
                     fixture_label=fixture_label,
                 )
             )
-
-        for channel in channels:
-            offset = int(channel["offset"])
-            if offset in handled_offsets or "value_map" in channel:
-                continue
+        elif fixture_specie == "moving_head" and "dim" in name_map:
+            dim_channel = name_map["dim"]
+            handled_offsets.add(int(dim_channel["offset"]))
             entities.append(
                 ArtNetDMXLight(
                     artnet_helper=artnet_helper,
-                    channel=absolute_channel(start_channel, offset),
+                    channel=absolute_channel(start_channel, int(dim_channel["offset"])),
                     entry_id=entry.entry_id,
                     fixture_id=fixture_id,
-                    channel_name=channel.get("name"),
-                    hidden_by_default=bool(channel.get("hidden_by_default", False)),
+                    channel_name=dim_channel.get("name"),
+                    hidden_by_default=bool(dim_channel.get("hidden_by_default", False)),
                     dmx_writer=dmx_writer,
                     fixture_label=fixture_label,
                 )
