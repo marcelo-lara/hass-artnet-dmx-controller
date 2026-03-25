@@ -84,5 +84,5 @@ def test_async_setup_entry_skips_value_map_channels_in_light_platform():
 
     asyncio.run(async_setup_entry(hass, entry, async_add_entities))
 
-    assert len(added) == 8
+    assert len(added) == 6
     assert all(entity.__class__.__name__ != "ArtNetDMXSelect" for entity in added)

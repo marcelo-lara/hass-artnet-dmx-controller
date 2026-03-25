@@ -123,6 +123,8 @@ Each config entry represents one fixture. Fixtures that point to the same Art-Ne
 
 Note: Entities created for a fixture depend on the chosen `fixture_type` and `start_channel`. Names and numbers may therefore vary by model. DMX channels default to `0` on startup, and select entities derive an explicit initial option from that value when possible so Home Assistant does not render them as `unknown`.
 
+Moving-head `pan` and `tilt` channels are exposed as numeric entities backed by their 16-bit DMX pairs. Updating one of these values writes the full 16-bit value and sends the corresponding MSB/LSB channel bytes to the shared universe buffer.
+
 ## Art-Net Protocol Details
 
 This integration implements the Art-Net protocol for DMX lighting control:

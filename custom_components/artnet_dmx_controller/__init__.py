@@ -35,6 +35,7 @@ if TYPE_CHECKING:
 
 PLATFORMS: list[Platform] = [
     Platform.LIGHT,
+    Platform.NUMBER,
     Platform.SELECT,
 ]
 

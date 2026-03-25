@@ -80,25 +80,8 @@ async def async_setup_entry(
 
         handled_offsets: set[int] = set()
 
-        for base_name, (msb_offset, lsb_offset) in bit16_pairs.items():
+        for msb_offset, lsb_offset in bit16_pairs.values():
             handled_offsets.update({msb_offset, lsb_offset})
-            msb_def = name_map[f"{base_name}_msb"]
-            lsb_def = name_map[f"{base_name}_lsb"]
-            entities.append(
-                ArtNetDMX16BitLight(
-                    artnet_helper=artnet_helper,
-                    msb_channel=absolute_channel(start_channel, msb_offset),
-                    lsb_channel=absolute_channel(start_channel, lsb_offset),
-                    entry_id=entry.entry_id,
-                    fixture_id=fixture_id,
-                    channel_name=base_name,
-                    hidden_by_default=bool(
-                        msb_def.get("hidden_by_default", False) or lsb_def.get("hidden_by_default", False)
-                    ),
-                    dmx_writer=dmx_writer,
-                    fixture_label=fixture_label,
-                )
-            )
 
         if rgb_group is not None:
             handled_offsets.update({rgb_group["red"], rgb_group["green"], rgb_group["blue"]})
@@ -325,92 +308,6 @@ class ArtNetDMXRGBLight(LightEntity):
             for channel, value in payload.items():
                 await self._artnet_helper.set_channel(channel, value)
         self._is_on = False
-        try:
-            self.async_write_ha_state()
-        except RuntimeError:
-            pass
-
-
-class ArtNetDMX16BitLight(LightEntity):
-    """Composite 16-bit channel represented as one Light entity."""
-
-    _attr_has_entity_name = True
-    _attr_should_poll = False
-    _attr_color_mode = ColorMode.BRIGHTNESS
-    _attr_supported_color_modes: ClassVar[set[ColorMode]] = {ColorMode.BRIGHTNESS}
-
-    def __init__(
-        self,
-        artnet_helper: ArtNetDMXHelper,
-        msb_channel: int,
-        lsb_channel: int,
-        entry_id: str,
-        fixture_id: str,
-        channel_name: str | None = None,
-        hidden_by_default: bool = False,
-        dmx_writer: DMXWriter | None = None,
-        fixture_label: str | None = None,
-    ) -> None:
-        self._artnet_helper = artnet_helper
-        self._dmx_writer = dmx_writer
-        self._msb = msb_channel
-        self._lsb = lsb_channel
-        self._attr_unique_id = f"{entry_id}_{fixture_id}_channel_{self._msb}_{self._lsb}"
-        human_label = _humanize(fixture_label) or fixture_label
-        human_channel = _humanize(channel_name) or channel_name
-        if human_label and human_channel:
-            self._attr_name = f"{human_label} {human_channel}"
-        elif human_label:
-            self._attr_name = f"{human_label} 16-bit {self._msb}"
-        elif human_channel:
-            self._attr_name = human_channel
-        else:
-            self._attr_name = f"DMX 16-bit {self._msb}"
-        self._attr_entity_registry_enabled_default = not bool(hidden_by_default)
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry_id)},
-            name=fixture_label or f"{entry_id} Fixture",
-        )
-        self._attr_icon = "mdi:lightbulb"
-        msb_value = _channel_value(artnet_helper, self._msb)
-        lsb_value = _channel_value(artnet_helper, self._lsb)
-        initial_16bit = (msb_value << 8) | lsb_value
-        self._brightness = initial_16bit // 257
-        self._is_on = initial_16bit > 0
-
-    @property
-    def is_on(self) -> bool:
-        return self._is_on
-
-    @property
-    def brightness(self) -> int:
-        return self._brightness
-
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        brightness = kwargs.get(ATTR_BRIGHTNESS, 255)
-        self._brightness = clamp_dmx_value(brightness)
-        self._is_on = True
-        value_16bit = int(self._brightness) * 257
-        msb = (value_16bit >> 8) & 0xFF
-        lsb = value_16bit & 0xFF
-        if self._dmx_writer is not None:
-            await self._dmx_writer.set_channels({self._msb: msb, self._lsb: lsb})
-        else:
-            await self._artnet_helper.set_channel(self._msb, msb)
-            await self._artnet_helper.set_channel(self._lsb, lsb)
-        try:
-            self.async_write_ha_state()
-        except RuntimeError:
-            pass
-
-    async def async_turn_off(self, **_kwargs: Any) -> None:
-        self._brightness = 0
-        self._is_on = False
-        if self._dmx_writer is not None:
-            await self._dmx_writer.set_channels({self._msb: 0, self._lsb: 0})
-        else:
-            await self._artnet_helper.set_channel(self._msb, 0)
-            await self._artnet_helper.set_channel(self._lsb, 0)
         try:
             self.async_write_ha_state()
         except RuntimeError:
