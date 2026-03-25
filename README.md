@@ -63,8 +63,8 @@ Create and activate a local Python virtual environment named `hass` before runni
 
 ```bash
 # from repo root
-python3 -m venv hass
-source hass/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
@@ -73,8 +73,8 @@ pip install -r requirements.txt
 
 ```powershell
 # from repo root
-py -m venv hass
-.\hass\Scripts\Activate.ps1
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
