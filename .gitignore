@@ -18,8 +18,7 @@ config/*
 !config/configuration.yaml
 
 # Venv
-hass/
-hass.*/
+.venv/
 bin/
 
 # VS Code settings
