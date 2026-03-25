@@ -9,27 +9,20 @@ def test_select_entity_value_map_and_send():
     hass = SimpleNamespace()
     hass.data = {}
 
-    # artnet helper that records sent channel/value pairs
     sent = []
 
-    async def set_channel(ch, val):
-        sent.append((ch, val))
+    async def set_channel(channel, value):
+        sent.append((channel, value))
 
     helper = SimpleNamespace()
     helper.set_channel = set_channel
     helper._dmx_data = bytearray(512)
-
-    def get_channel_value(channel):
-        return helper._dmx_data[channel - 1]
-
-    helper.get_channel_value = get_channel_value
+    helper.get_channel_value = lambda channel: helper._dmx_data[channel - 1]
 
     entry_id = "select-test-entry"
-    domain = "artnet_dmx_controller"
-    hass.data.setdefault(domain, {})
-    hass.data[domain][entry_id] = helper
+    hass.data.setdefault("artnet_dmx_controller", {})
+    hass.data["artnet_dmx_controller"][entry_id] = helper
 
-    # mapping with one channel having a value_map
     mapping = {
         "fixtures": {
             "vm": {
@@ -46,7 +39,6 @@ def test_select_entity_value_map_and_send():
         }
     }
 
-    # Monkeypatch loader on select module
     sel_mod = importlib.import_module("custom_components.artnet_dmx_controller.select")
     orig_loader = sel_mod.load_fixture_mapping
     sel_mod.load_fixture_mapping = lambda: mapping
@@ -55,9 +47,12 @@ def test_select_entity_value_map_and_send():
         entry = SimpleNamespace(
             entry_id=entry_id,
             data={
-                "fixtures": [
-                    {"id": "fixture-vm", "fixture_type": "vm", "start_channel": 20, "channel_count": 1}
-                ]
+                "id": "fixture-vm",
+                "target_ip": "192.168.1.100",
+                "universe": 0,
+                "fixture_type": "vm",
+                "start_channel": 20,
+                "channel_count": 1,
             },
         )
 
@@ -67,22 +62,16 @@ def test_select_entity_value_map_and_send():
             added.extend(entities)
 
         asyncio.run(select_mod.async_setup_entry(hass, entry, async_add_entities))
-
     finally:
-        # restore loader
         sel_mod.load_fixture_mapping = orig_loader
 
-    # find the select entity (has options)
-    select_entities = [e for e in added if hasattr(e, "options")]
+    select_entities = [entity for entity in added if hasattr(entity, "options")]
     assert len(select_entities) == 1
-    sel = select_entities[0]
+    entity = select_entities[0]
+    assert set(entity.options) == {"White", "Red", "Blue"}
+    assert entity.current_option == "White"
 
-    # options should match mapping labels
-    assert set(sel.options) == {"White", "Red", "Blue"}
-    assert sel.current_option == "White"
-
-    # select an option and verify helper recorded the numeric value
-    asyncio.run(sel.async_select_option("Red"))
+    asyncio.run(entity.async_select_option("Red"))
     assert sent == [(20, 10)]
 
 

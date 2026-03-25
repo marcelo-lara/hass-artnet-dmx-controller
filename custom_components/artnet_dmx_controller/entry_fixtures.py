@@ -1,4 +1,4 @@
-"""Helpers for fixture data stored inside config entries."""
+"""Helpers for fixture-first config entries."""
 
 from __future__ import annotations
 
@@ -11,22 +11,32 @@ from .const import (
     CONF_CHANNEL_COUNT,
     CONF_FIXTURE_ID,
     CONF_FIXTURE_TYPE,
-    CONF_FIXTURES,
+    CONF_LOCATION,
     CONF_NAME,
     CONF_START_CHANNEL,
+    CONF_TARGET_IP,
+    CONF_UNIVERSE,
 )
 from .fixture_mapping import HomeAssistantError
 
 
-def build_fixture_config(
+LEGACY_CONF_FIXTURES = "fixtures"
+
+
+def build_fixture_entry_data(
+    target_ip: str,
+    universe: int,
     fixture_type: str,
     start_channel: int,
     channel_count: int,
     name: str | None = None,
     fixture_id: str | None = None,
+    location: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Return normalized fixture config data."""
+    """Return normalized fixture-entry data."""
     fixture: dict[str, Any] = {
+        CONF_TARGET_IP: str(target_ip),
+        CONF_UNIVERSE: int(universe),
         CONF_FIXTURE_ID: fixture_id or uuid4().hex,
         CONF_FIXTURE_TYPE: fixture_type,
         CONF_START_CHANNEL: int(start_channel),
@@ -34,41 +44,16 @@ def build_fixture_config(
     }
     if name:
         fixture[CONF_NAME] = name.strip()
+    if location is not None:
+        fixture[CONF_LOCATION] = deepcopy(location)
     return fixture
 
 
-def normalize_entry_data(data: dict[str, Any]) -> dict[str, Any]:
-    """Normalize config-entry data into the fixtures-list format."""
+def normalize_fixture_entry_data(data: dict[str, Any]) -> dict[str, Any]:
+    """Normalize config-entry data into the fixture-first format."""
     normalized = dict(data)
-    fixtures = normalized.get(CONF_FIXTURES)
-    if isinstance(fixtures, list):
-        normalized[CONF_FIXTURES] = [normalize_fixture(fixture) for fixture in fixtures]
-        return normalized
-
-    legacy_fixture_type = normalized.get(CONF_FIXTURE_TYPE)
-    legacy_start_channel = normalized.get(CONF_START_CHANNEL)
-    legacy_channel_count = normalized.get(CONF_CHANNEL_COUNT)
-    legacy_name = normalized.get(CONF_NAME)
-    normalized[CONF_FIXTURES] = []
-    if legacy_fixture_type and legacy_start_channel and legacy_channel_count:
-        normalized[CONF_FIXTURES] = [
-            build_fixture_config(
-                fixture_type=str(legacy_fixture_type),
-                start_channel=int(legacy_start_channel),
-                channel_count=int(legacy_channel_count),
-                name=legacy_name if isinstance(legacy_name, str) else None,
-                fixture_id="legacy",
-            )
-        ]
-    normalized.pop(CONF_FIXTURE_TYPE, None)
-    normalized.pop(CONF_START_CHANNEL, None)
-    normalized.pop(CONF_CHANNEL_COUNT, None)
-    return normalized
-
-
-def normalize_fixture(fixture: dict[str, Any]) -> dict[str, Any]:
-    """Normalize one fixture definition."""
-    normalized = dict(fixture)
+    normalized[CONF_TARGET_IP] = str(normalized[CONF_TARGET_IP])
+    normalized[CONF_UNIVERSE] = int(normalized[CONF_UNIVERSE])
     normalized[CONF_FIXTURE_ID] = str(normalized.get(CONF_FIXTURE_ID) or uuid4().hex)
     normalized[CONF_FIXTURE_TYPE] = str(normalized[CONF_FIXTURE_TYPE])
     normalized[CONF_START_CHANNEL] = int(normalized[CONF_START_CHANNEL])
@@ -82,19 +67,86 @@ def normalize_fixture(fixture: dict[str, Any]) -> dict[str, Any]:
             normalized.pop(CONF_NAME, None)
     else:
         normalized.pop(CONF_NAME, None)
+    if CONF_LOCATION in normalized:
+        normalized[CONF_LOCATION] = deepcopy(normalized[CONF_LOCATION])
     return normalized
 
 
-def get_entry_fixtures(entry_or_data: Any) -> list[dict[str, Any]]:
-    """Return normalized fixture list for a config entry or raw data."""
+def extract_fixture_records(entry_or_data: Any) -> list[dict[str, Any]]:
+    """Return fixture records from current or legacy config-entry data."""
     data = entry_or_data.data if hasattr(entry_or_data, "data") else entry_or_data
-    normalized = normalize_entry_data(data)
-    return deepcopy(normalized.get(CONF_FIXTURES, []))
+    if {
+        CONF_TARGET_IP,
+        CONF_UNIVERSE,
+        CONF_FIXTURE_TYPE,
+        CONF_START_CHANNEL,
+        CONF_CHANNEL_COUNT,
+    }.issubset(data):
+        return [normalize_fixture_entry_data(data)]
+
+    fixtures = data.get(LEGACY_CONF_FIXTURES)
+    if not isinstance(fixtures, list):
+        return []
+
+    target_ip = data.get(CONF_TARGET_IP)
+    universe = data.get(CONF_UNIVERSE)
+    if target_ip is None or universe is None:
+        return []
+
+    records: list[dict[str, Any]] = []
+    for fixture in fixtures:
+        if not isinstance(fixture, dict):
+            continue
+        if not {
+            CONF_FIXTURE_TYPE,
+            CONF_START_CHANNEL,
+            CONF_CHANNEL_COUNT,
+        }.issubset(fixture):
+            continue
+        records.append(
+            build_fixture_entry_data(
+                target_ip=str(target_ip),
+                universe=int(universe),
+                fixture_type=str(fixture[CONF_FIXTURE_TYPE]),
+                start_channel=int(fixture[CONF_START_CHANNEL]),
+                channel_count=int(fixture[CONF_CHANNEL_COUNT]),
+                name=fixture.get(CONF_NAME) if isinstance(fixture.get(CONF_NAME), str) else data.get(CONF_NAME),
+                fixture_id=fixture.get(CONF_FIXTURE_ID),
+                location=fixture.get(CONF_LOCATION),
+            )
+        )
+    return records
 
 
-def fixture_label(fixture: dict[str, Any], fallback: str | None = None) -> str | None:
-    """Return display label for a fixture."""
-    return fixture.get(CONF_NAME) or fallback or fixture.get(CONF_FIXTURE_TYPE)
+def get_fixture_entry(entry_or_data: Any) -> dict[str, Any]:
+    """Return one normalized fixture entry from current config-entry data."""
+    records = extract_fixture_records(entry_or_data)
+    if not records:
+        msg = "Fixture entry data is missing required fields"
+        raise HomeAssistantError(msg)
+    return deepcopy(records[0])
+
+
+def fixture_label(entry_or_data: Any, fallback: str | None = None) -> str | None:
+    """Return display label for a fixture entry."""
+    data = entry_or_data.data if hasattr(entry_or_data, "data") else entry_or_data
+    return data.get(CONF_NAME) or fallback or data.get(CONF_FIXTURE_TYPE)
+
+
+def fixture_title(entry_or_data: Any) -> str:
+    """Return a Home Assistant config-entry title for a fixture entry."""
+    data = entry_or_data.data if hasattr(entry_or_data, "data") else entry_or_data
+    label = fixture_label(data) or "DMX Fixture"
+    return f"{label} ({data[CONF_TARGET_IP]} U:{data[CONF_UNIVERSE]} CH:{data[CONF_START_CHANNEL]})"
+
+
+def fixture_channels(entry_or_data: Any) -> list[int]:
+    """Return all absolute channels belonging to a fixture entry."""
+    data = entry_or_data.data if hasattr(entry_or_data, "data") else entry_or_data
+    normalized = normalize_fixture_entry_data(data)
+    start_channel = int(normalized[CONF_START_CHANNEL])
+    channel_count = int(normalized[CONF_CHANNEL_COUNT])
+    return list(range(start_channel, start_channel + channel_count))
 
 
 def validate_fixture_channels(fixture: dict[str, Any]) -> None:
@@ -103,17 +155,23 @@ def validate_fixture_channels(fixture: dict[str, Any]) -> None:
 
 
 def validate_fixture_overlap(
-    fixtures: list[dict[str, Any]],
+    entries: list[Any],
     candidate: dict[str, Any],
-    exclude_fixture_id: str | None = None,
+    exclude_entry_id: str | None = None,
 ) -> None:
-    """Raise if candidate overlaps any sibling fixture."""
+    """Raise if candidate overlaps any fixture on the same target IP and universe."""
+    candidate = normalize_fixture_entry_data(candidate)
     candidate_start = int(candidate[CONF_START_CHANNEL])
     candidate_end = candidate_start + int(candidate[CONF_CHANNEL_COUNT]) - 1
-    for fixture in fixtures:
-        if fixture.get(CONF_FIXTURE_ID) == exclude_fixture_id:
+    for entry in entries:
+        if hasattr(entry, "entry_id") and entry.entry_id == exclude_entry_id:
             continue
-        start = int(fixture[CONF_START_CHANNEL])
-        end = start + int(fixture[CONF_CHANNEL_COUNT]) - 1
-        if not (end < candidate_start or candidate_end < start):
-            raise HomeAssistantError("channel_overlap")
+        for fixture in extract_fixture_records(entry):
+            if fixture[CONF_TARGET_IP] != candidate[CONF_TARGET_IP]:
+                continue
+            if int(fixture[CONF_UNIVERSE]) != int(candidate[CONF_UNIVERSE]):
+                continue
+            start = int(fixture[CONF_START_CHANNEL])
+            end = start + int(fixture[CONF_CHANNEL_COUNT]) - 1
+            if not (end < candidate_start or candidate_end < start):
+                raise HomeAssistantError("channel_overlap")

@@ -3,11 +3,13 @@
     "step": {
       "user": {
         "title": "Configure ArtNet DMX Controller",
-        "description": "Create one DMX node by entering the target IP address and universe for your Art-Net device. Fixtures can be added afterwards from the integration options.",
+        "description": "Create one fixture by entering the Art-Net target, universe, fixture type, and base channel.",
         "data": {
           "target_ip": "Target IP Address",
           "universe": "Universe (0-32767)",
-          "name": "Node Name"
+          "fixture_type": "Fixture Type",
+          "start_channel": "Base Channel",
+          "name": "Fixture Name"
         }
       }
     },
@@ -24,49 +26,24 @@
   },
   "options": {
     "step": {
-      "node_options": {
-        "title": "Node Options",
-        "description": "Configure default behavior for this DMX node.",
+      "runtime_options": {
+        "title": "Runtime Options",
+        "description": "Configure default behavior for this fixture entry.",
         "data": {
-          "default_transition": "Default Transition",
-          "expose_scenes": "Expose Scenes"
+          "default_transition": "Default Transition"
         }
       },
-      "add_fixture": {
-        "title": "Add Fixture",
-        "description": "Add a fixture to this node and universe.",
+      "fixture_options": {
+        "title": "Fixture Options",
+        "description": "Edit the fixture target, model, base channel, and display name.",
         "data": {
+          "target_ip": "Target IP Address",
+          "universe": "Universe (0-32767)",
           "fixture_type": "Fixture Type",
-          "start_channel": "Start Channel",
+          "start_channel": "Base Channel",
           "name": "Fixture Name"
-        }
-      },
-      "edit_fixture": {
-        "title": "Edit Fixture",
-        "description": "Choose a fixture to edit.",
-        "data": {
-          "id": "Fixture"
-        }
-      },
-      "edit_fixture_details": {
-        "title": "Edit Fixture",
-        "description": "Update the selected fixture for this node and universe.",
-        "data": {
-          "fixture_type": "Fixture Type",
-          "start_channel": "Start Channel",
-          "name": "Fixture Name"
-        }
-      },
-      "remove_fixture": {
-        "title": "Remove Fixture",
-        "description": "Remove a fixture from this node and universe.",
-        "data": {
-          "id": "Fixture"
         }
       }
-    },
-    "abort": {
-      "no_fixtures": "No fixtures are configured for this node"
     }
   }
 }

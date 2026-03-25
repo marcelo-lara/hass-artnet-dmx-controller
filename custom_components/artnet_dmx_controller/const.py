@@ -10,16 +10,22 @@ DEFAULT_PORT = 6454
 # Config flow constants
 CONF_TARGET_IP = "target_ip"
 CONF_UNIVERSE = "universe"
-CONF_FIXTURES = "fixtures"
 CONF_FIXTURE_ID = "id"
 CONF_FIXTURE_TYPE = "fixture_type"
 CONF_START_CHANNEL = "start_channel"
 CONF_CHANNEL_COUNT = "channel_count"
 CONF_NAME = "name"
+CONF_LOCATION = "location"
+
+# Runtime storage keys
+DATA_ENTRY_DATA = "entry_data"
+DATA_ENTRY_HELPER_KEYS = "entry_helper_keys"
+DATA_HELPER_LOCK = "helper_lock"
+DATA_HELPER_REFCOUNTS = "helper_refcounts"
+DATA_SHARED_HELPERS = "shared_helpers"
 
 # Default values
 DEFAULT_UNIVERSE = 0
-DEFAULT_CHANNEL_COUNT = 10
 
 # DMX constants
 DMX_CHANNELS = 512

@@ -1,9 +1,7 @@
 import asyncio
 from types import SimpleNamespace
 
-from custom_components.artnet_dmx_controller.light import (
-    async_setup_entry,
-)
+from custom_components.artnet_dmx_controller.light import async_setup_entry
 
 
 class DummyArtNetHelper:
@@ -25,69 +23,57 @@ class DummyEntry:
 
 
 def test_async_setup_entry_creates_fixture_entities():
-    # Prepare fake hass with minimal data storage
     hass = SimpleNamespace()
     hass.data = {}
 
-    # Create a dummy artnet helper and register under domain
     helper = DummyArtNetHelper()
-    domain = "artnet_dmx_controller"
     entry_id = "test-entry"
-    hass.data.setdefault(domain, {})
-    hass.data[domain][entry_id] = helper
+    hass.data.setdefault("artnet_dmx_controller", {})
+    hass.data["artnet_dmx_controller"][entry_id] = helper
 
-    # Use a known fixture type from the bundled mapping: 'parcan' (5 channels)
     entry = DummyEntry(
         entry_id,
         {
-            "fixtures": [
-                {"id": "fixture-1", "fixture_type": "parcan", "start_channel": 10, "channel_count": 5}
-            ]
+            "id": "fixture-1",
+            "target_ip": "192.168.1.100",
+            "universe": 0,
+            "fixture_type": "parcan_rgb_gen",
+            "start_channel": 10,
+            "channel_count": 5,
         },
     )
 
     added = []
 
     def async_add_entities(entities):
-        # mimic Home Assistant's async_add_entities which may be sync in tests
         added.extend(entities)
 
-    # Run the async setup
     asyncio.run(async_setup_entry(hass, entry, async_add_entities))
 
-    # Expect composite RGB + strobe for parcan -> 2 entities
     assert len(added) == 2
-
-    # Find rgb composite entity (we detect by presence of internal _red attribute)
-    rgb_entities = [e for e in added if hasattr(e, "_red") and hasattr(e, "_green") and hasattr(e, "_blue")]
+    rgb_entities = [entity for entity in added if hasattr(entity, "_red") and hasattr(entity, "_green")]
     assert len(rgb_entities) == 1
-    strobe_entities = [e for e in added if e not in rgb_entities]
-    assert len(strobe_entities) == 1
-
-    # Ensure unique ids present and stable
-    unique_ids = {e._attr_unique_id for e in added}
-    assert len(unique_ids) == 2
+    assert len({entity._attr_unique_id for entity in added}) == 2
 
 
 def test_async_setup_entry_skips_value_map_channels_in_light_platform():
-    # Prepare fake hass with minimal data storage
     hass = SimpleNamespace()
     hass.data = {}
 
     helper = DummyArtNetHelper()
-    domain = "artnet_dmx_controller"
     entry_id = "test-entry-value-map"
-    hass.data.setdefault(domain, {})
-    hass.data[domain][entry_id] = helper
+    hass.data.setdefault("artnet_dmx_controller", {})
+    hass.data["artnet_dmx_controller"][entry_id] = helper
 
-    # mini_beam_prism includes value_map channels (color/gobo) that should be
-    # created only by the select platform, not light platform.
     entry = DummyEntry(
         entry_id,
         {
-            "fixtures": [
-                {"id": "fixture-1", "fixture_type": "mini_beam_prism", "start_channel": 1, "channel_count": 12}
-            ]
+            "id": "fixture-1",
+            "target_ip": "192.168.1.100",
+            "universe": 0,
+            "fixture_type": "mini_beam_prism",
+            "start_channel": 1,
+            "channel_count": 12,
         },
     )
 
@@ -98,41 +84,5 @@ def test_async_setup_entry_skips_value_map_channels_in_light_platform():
 
     asyncio.run(async_setup_entry(hass, entry, async_add_entities))
 
-    # Expected light platform entities:
-    # - pan + tilt as 16-bit composites: 2
-    # - speed, dim, strobe, prism, autoplay, reset as lights: 6
-    # Total: 8
     assert len(added) == 8
-    # Select entities should not be created by light.py
-    assert all(e.__class__.__name__ != "ArtNetDMXSelect" for e in added)
-
-
-def test_async_setup_entry_supports_multiple_fixtures_in_one_entry():
-    hass = SimpleNamespace()
-    hass.data = {}
-
-    helper = DummyArtNetHelper()
-    domain = "artnet_dmx_controller"
-    entry_id = "test-entry-multi"
-    hass.data.setdefault(domain, {})
-    hass.data[domain][entry_id] = helper
-
-    entry = DummyEntry(
-        entry_id,
-        {
-            "fixtures": [
-                {"id": "fixture-a", "fixture_type": "parcan", "start_channel": 1, "channel_count": 5},
-                {"id": "fixture-b", "fixture_type": "parcan", "start_channel": 10, "channel_count": 5},
-            ]
-        },
-    )
-
-    added = []
-
-    def async_add_entities(entities):
-        added.extend(entities)
-
-    asyncio.run(async_setup_entry(hass, entry, async_add_entities))
-
-    assert len(added) == 4
-    assert len({entity._attr_unique_id for entity in added}) == 4
+    assert all(entity.__class__.__name__ != "ArtNetDMXSelect" for entity in added)

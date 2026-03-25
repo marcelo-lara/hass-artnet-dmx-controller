@@ -55,9 +55,9 @@ cp -r custom_components/artnet_dmx_controller /config/custom_components/
 - This integration uses Art-Net (UDP) to send DMX; ensure your target device IP and network allow UDP/6454 traffic.
 - For development/testing, run Home Assistant in a dev environment and monitor logs while adding the integration.
 
-## Python virtual environment (`hass`)
+## Python virtual environment
 
-Create and activate a local Python virtual environment named `hass` before running development commands.
+Create and activate a local Python virtual environment before running development commands.
 
 ### Linux / macOS
 
@@ -106,65 +106,22 @@ hass/bin/python -m pytest -q
 4. Enter the configuration:
    - **Target IP Address**: The IP address of your Art-Net device
    - **Universe**: The Art-Net universe number (0-32767)
-   - **Node Name**: Optional Home Assistant display name for this DMX node
-5. Open the integration options to add one or more fixtures to that node/universe.
+   - **Fixture Type**: The fixture model from `fixture_mapping.json`
+   - **Base Channel**: The first DMX channel used by that fixture
+   - **Fixture Name**: Optional Home Assistant display name for this fixture
 
 ## Usage
 
-Each config entry represents one Art-Net target IP plus one universe. Fixtures attached to that entry share the same DMX buffer and appear as entities under the same Home Assistant device.
+Each config entry represents one fixture. Fixtures that point to the same Art-Net target IP and universe still share one DMX universe buffer internally, so changing one fixture preserves the last values of the other channels in that universe while re-sending the full frame.
 
 ## Fixture Mapping & Config Flow
 
 - This integration uses a shared `fixture_mapping.json` as the single source of truth for fixture models and channel definitions. Fixture models include channel offsets, channel counts, and optional `value_map` entries for selector-type channels.
-- The initial config flow creates a node/universe entry only.
-- Add fixtures afterwards from the integration options by choosing a `fixture_type` (model) and a `start_channel`.
-- Edit existing fixtures from the same integration options flow by selecting the fixture first, then updating its model, start channel, or display name.
-- Remove fixtures from the integration options flow when they are no longer attached to that node/universe.
-- Channel overlap is validated within that node/universe so fixtures cannot claim the same DMX addresses.
+- The initial config flow creates the fixture entry directly.
+- Edit an existing fixture from the integration options by updating its target IP, universe, model, base channel, or display name.
+- Channel overlap is validated across all fixtures that target the same IP and universe so entries cannot claim the same DMX addresses.
 
 Note: Entities created for a fixture depend on the chosen `fixture_type` and `start_channel`. Names and numbers may therefore vary by model. DMX channels default to `0` on startup, and select entities derive an explicit initial option from that value when possible so Home Assistant does not render them as `unknown`.
-
-## Scenes (Record / Play)
-
-The integration provides simple scene persistence and playback services registered under the integration domain (`artnet_dmx_controller`). These services operate on the DMX-level payloads captured from the current integration state.
-
-Service names and example usage (Developer Tools → Services):
-
-- `artnet_dmx_controller.record_scene` — Record the current DMX state for an entry (config entry) into a named scene.
-   - Required data: `entry_id` (the config entry id), `name` (scene name)
-
-Example (YAML payload in Developer Tools):
-
-```yaml
-service: artnet_dmx_controller.record_scene
-data:
-   entry_id: your_entry_id_here
-   name: evening_preset
-```
-
-- `artnet_dmx_controller.play_scene` — Play an existing scene for a given entry.
-   - Required data: `entry_id`, `name`; Optional: `transition` (seconds)
-
-```yaml
-service: artnet_dmx_controller.play_scene
-data:
-   entry_id: your_entry_id_here
-   name: evening_preset
-   transition: 1
-```
-
-- `artnet_dmx_controller.list_scenes` — Log or list available scenes (no data required).
-
-- `artnet_dmx_controller.delete_scene` — Delete a saved scene by name.
-   - Required data: `name`
-
-```yaml
-service: artnet_dmx_controller.delete_scene
-data:
-   name: evening_preset
-```
-
-Scenes are stored in the integration's internal storage and survive restarts.
 
 ## Art-Net Protocol Details
 

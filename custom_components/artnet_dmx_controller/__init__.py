@@ -7,24 +7,27 @@ https://github.com/marcelo-lara/hass-artnet-dmx-controller
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 
-import voluptuous as vol
 from homeassistant.const import Platform
-from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 
 from .artnet import ArtNetDMXHelper
-from .const import CONF_FIXTURES, CONF_TARGET_IP, CONF_UNIVERSE, DOMAIN, LOGGER
-from .entry_fixtures import get_entry_fixtures, normalize_entry_data
-from .scene.scene_store import SceneStore
-from .scene_services import async_play_scene, async_record_scene
-
-# Service schemas
-RECORD_SCHEMA = vol.Schema({vol.Required("entry_id"): cv.string, vol.Required("name"): cv.string})
-PLAY_SCHEMA = vol.Schema({vol.Required("entry_id"): cv.string, vol.Required("name"): cv.string, vol.Optional("transition"): vol.Any(None, vol.Coerce(int))})
-DELETE_SCHEMA = vol.Schema({vol.Required("name"): cv.string})
-LIST_SCHEMA = vol.Schema({})
+from .const import (
+    CONF_FIXTURE_TYPE,
+    CONF_NAME,
+    CONF_TARGET_IP,
+    CONF_UNIVERSE,
+    DATA_ENTRY_DATA,
+    DATA_ENTRY_HELPER_KEYS,
+    DATA_HELPER_LOCK,
+    DATA_HELPER_REFCOUNTS,
+    DATA_SHARED_HELPERS,
+    DOMAIN,
+    LOGGER,
+)
+from .entry_fixtures import extract_fixture_records, fixture_label, fixture_title, get_fixture_entry
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -37,15 +40,28 @@ PLATFORMS: list[Platform] = [
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Migrate old single-fixture entries to the fixtures-list model."""
-    if entry.version >= 2:
+    """Migrate old entries to the fixture-first format."""
+    if entry.version >= 3:
         return True
 
-    if entry.version == 1:
-        updated_data = normalize_entry_data(entry.data)
-        hass.config_entries.async_update_entry(entry, data=updated_data, version=2)
-        LOGGER.info("Migrated ArtNet DMX entry %s to version 2", entry.entry_id)
+    fixture_records = extract_fixture_records(entry.data)
+    if entry.version in (1, 2) and len(fixture_records) == 1:
+        updated_data = fixture_records[0]
+        hass.config_entries.async_update_entry(
+            entry,
+            data=updated_data,
+            title=fixture_title(updated_data),
+            version=3,
+        )
+        LOGGER.info("Migrated ArtNet DMX entry %s to version 3", entry.entry_id)
         return True
+
+    if entry.version == 2 and len(fixture_records) > 1:
+        LOGGER.error(
+            "Entry %s uses an unsupported legacy multi-fixture format; remove and re-add fixtures individually",
+            entry.entry_id,
+        )
+        return False
 
     LOGGER.error("Unsupported ArtNet DMX entry version %s", entry.version)
     return False
@@ -56,81 +72,38 @@ async def async_setup_entry(
     entry: ConfigEntry,
 ) -> bool:
     """Set up ArtNet DMX Controller from a config entry."""
-    target_ip = entry.data[CONF_TARGET_IP]
-    universe = entry.data[CONF_UNIVERSE]
+    fixture_entry = get_fixture_entry(entry)
+    target_ip = fixture_entry[CONF_TARGET_IP]
+    universe = fixture_entry[CONF_UNIVERSE]
 
-    # Create Art-Net helper
-    artnet_helper = ArtNetDMXHelper(
-        hass=hass,
-        target_ip=target_ip,
-        universe=universe,
-    )
+    artnet_helper, helper_key = await _async_acquire_helper(hass, target_ip, universe)
 
-    # Setup the socket
-    artnet_helper.setup_socket()
-    await artnet_helper.async_send_current_state()
-
-    # Store the helper in hass.data
-    hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = artnet_helper
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    domain_data[entry.entry_id] = artnet_helper
+    domain_data.setdefault(DATA_ENTRY_DATA, {})[entry.entry_id] = fixture_entry
+    domain_data.setdefault(DATA_ENTRY_HELPER_KEYS, {})[entry.entry_id] = helper_key
 
     # Create/update a device registry entry so the integration appears under Devices
     # even if entities are disabled or not yet added.
     try:
         device_name = (
-            entry.data.get("name")
+            fixture_entry.get(CONF_NAME)
             or getattr(entry, "title", None)
-            or f"ArtNet DMX ({target_ip} U:{universe})"
+            or fixture_label(fixture_entry)
+            or fixture_title(fixture_entry)
         )
-        fixtures = get_entry_fixtures(entry)
-        model = "DMX Node"
-        if len(fixtures) == 1:
-            model = fixtures[0].get("fixture_type") or model
-        elif fixtures:
-            model = f"DMX Node ({len(fixtures)} fixtures)"
         dr.async_get(hass).async_get_or_create(
             config_entry_id=entry.entry_id,
             identifiers={(DOMAIN, entry.entry_id)},
             manufacturer="Art-Net",
-            model=model,
+            model=fixture_entry.get(CONF_FIXTURE_TYPE) or "DMX Fixture",
             name=device_name,
         )
     except Exception:  # pragma: no cover - best effort for non-HA/unit-test stubs
         LOGGER.debug("Could not register device for entry %s", entry.entry_id, exc_info=True)
 
-    # Initialize shared SceneStore and register services once
-    scene_key = f"{DOMAIN}_scene_store"
-    if scene_key not in hass.data:
-        store = SceneStore(hass)
-        await store.async_load()
-        hass.data[scene_key] = store
-
-        # Register services for scene recording and playback under the integration domain
-        async def _svc_record(call):
-            entry_id = call.data.get("entry_id")
-            name = call.data.get("name")
-            await async_record_scene(hass, entry_id, name)
-
-        async def _svc_play(call):
-            entry_id = call.data.get("entry_id")
-            name = call.data.get("name")
-            await async_play_scene(hass, entry_id, name)
-
-        async def _svc_list(call):
-            scenes = hass.data.get(f"{DOMAIN}_scene_store").async_list()
-            LOGGER.info("Available scenes: %s", list(scenes.keys()))
-
-        async def _svc_delete(call):
-            name = call.data.get("name")
-            await hass.data.get(f"{DOMAIN}_scene_store").async_delete(name)
-
-        hass.services.async_register(DOMAIN, "record_scene", _svc_record, schema=RECORD_SCHEMA)
-        hass.services.async_register(DOMAIN, "play_scene", _svc_play, schema=PLAY_SCHEMA)
-        hass.services.async_register(DOMAIN, "list_scenes", _svc_list, schema=LIST_SCHEMA)
-        hass.services.async_register(DOMAIN, "delete_scene", _svc_delete, schema=DELETE_SCHEMA)
-
     LOGGER.info(
-        "ArtNet DMX Controller configured for %s (Universe %s)",
+        "ArtNet DMX fixture configured for %s (Universe %s)",
         target_ip,
         universe,
     )
@@ -146,11 +119,59 @@ async def async_unload_entry(
     entry: ConfigEntry,
 ) -> bool:
     """Handle removal of an entry."""
-    # Close the socket
-    if entry.entry_id in hass.data[DOMAIN]:
-        artnet_helper = hass.data[DOMAIN][entry.entry_id]
-        artnet_helper.close_socket()
-        hass.data[DOMAIN].pop(entry.entry_id)
-
     # Unload the platforms
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unloaded:
+        await _async_release_helper(hass, entry.entry_id)
+    return unloaded
+
+
+async def _async_acquire_helper(
+    hass: HomeAssistant,
+    target_ip: str,
+    universe: int,
+) -> tuple[ArtNetDMXHelper, tuple[str, int]]:
+    """Get or create a shared helper for one Art-Net target and universe."""
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    shared_helpers = domain_data.setdefault(DATA_SHARED_HELPERS, {})
+    helper_refcounts = domain_data.setdefault(DATA_HELPER_REFCOUNTS, {})
+    helper_lock = domain_data.setdefault(DATA_HELPER_LOCK, asyncio.Lock())
+    helper_key = (target_ip, int(universe))
+
+    async with helper_lock:
+        artnet_helper = shared_helpers.get(helper_key)
+        if artnet_helper is None:
+            artnet_helper = ArtNetDMXHelper(hass=hass, target_ip=target_ip, universe=universe)
+            artnet_helper.setup_socket()
+            await artnet_helper.async_send_current_state()
+            shared_helpers[helper_key] = artnet_helper
+            helper_refcounts[helper_key] = 0
+        helper_refcounts[helper_key] += 1
+
+    return artnet_helper, helper_key
+
+
+async def _async_release_helper(hass: HomeAssistant, entry_id: str) -> None:
+    """Release a shared helper reference for one fixture entry."""
+    domain_data = hass.data.get(DOMAIN, {})
+    helper_key = domain_data.get(DATA_ENTRY_HELPER_KEYS, {}).pop(entry_id, None)
+    domain_data.get(DATA_ENTRY_DATA, {}).pop(entry_id, None)
+    domain_data.pop(entry_id, None)
+    if helper_key is None:
+        return
+
+    shared_helpers = domain_data.get(DATA_SHARED_HELPERS, {})
+    helper_refcounts = domain_data.get(DATA_HELPER_REFCOUNTS, {})
+    helper_lock = domain_data.get(DATA_HELPER_LOCK)
+    if helper_lock is None:
+        return
+
+    async with helper_lock:
+        if helper_key not in helper_refcounts:
+            return
+        helper_refcounts[helper_key] -= 1
+        if helper_refcounts[helper_key] <= 0:
+            artnet_helper = shared_helpers.pop(helper_key, None)
+            helper_refcounts.pop(helper_key, None)
+            if artnet_helper is not None:
+                artnet_helper.close_socket()

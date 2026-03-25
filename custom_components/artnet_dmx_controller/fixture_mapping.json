@@ -3,7 +3,6 @@
   "fixtures": {
     "mini_beam_prism": {
       "fixture_specie": "moving_head",
-      "source_fixture_ids": ["mini_beam_prism_l", "mini_beam_prism_r"],
       "channel_count": 12,
       "channels": [
         { "name": "pan_msb", "offset": 1, "description": "Pan coarse (16-bit high byte)" },
@@ -70,7 +69,6 @@
     },
     "head_el150": {
       "fixture_specie": "moving_head",
-      "source_fixture_ids": ["head_el150"],
       "channel_count": 9,
       "channels": [
         { "name": "pan_msb", "offset": 1, "description": "Pan coarse (16-bit high byte)" },
@@ -112,9 +110,8 @@
         }
       ]
     },
-    "parcan": {
+    "parcan_rgb_gen": {
       "fixture_specie": "parcan",
-      "source_fixture_ids": ["parcan_l"],
       "channel_count": 5,
       "channels": [
         { "name": "dim", "offset": 1, "description": "Master dimmer" },
@@ -124,9 +121,8 @@
         { "name": "strobe", "offset": 5, "description": "Strobe speed" }
       ]
     },
-    "proton": {
+    "parcan_rgb_proton": {
       "fixture_specie": "parcan",
-      "source_fixture_ids": ["parcan_r", "parcan_pl", "parcan_pr"],
       "channel_count": 6,
       "channels": [
         { "name": "dim", "offset": 1, "description": "Master dimmer" },

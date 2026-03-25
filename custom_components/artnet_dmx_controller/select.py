@@ -2,23 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from .channel_math import clamp_dmx_value, label_from_value, value_from_label
-from .const import DOMAIN, LOGGER
+from .const import CONF_FIXTURE_ID, CONF_FIXTURE_TYPE, CONF_NAME, CONF_START_CHANNEL, DOMAIN, LOGGER
 from .dmx_writer import DMXWriter
-from .entry_fixtures import fixture_label as get_fixture_label
-from .entry_fixtures import get_entry_fixtures
+from .entry_fixtures import get_fixture_entry
 from .fixture_mapping import HomeAssistantError, load_fixture_mapping
-
-
-def _humanize(text: str | None) -> str | None:
-    if not text:
-        return None
-    return str(text).replace("_", " ").strip().title()
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -28,49 +21,58 @@ if TYPE_CHECKING:
     from .artnet import ArtNetDMXHelper
 
 
-async def async_setup_entry(hass: "HomeAssistant", entry: "ConfigEntry", async_add_entities: "AddEntitiesCallback") -> None:
-    """Set up select entities for ArtNet DMX from a config entry."""
+def _humanize(text: str | None) -> str | None:
+    if not text:
+        return None
+    return str(text).replace("_", " ").strip().title()
+
+
+async def async_setup_entry(
+    hass: "HomeAssistant",
+    entry: "ConfigEntry",
+    async_add_entities: "AddEntitiesCallback",
+) -> None:
+    """Set up select entities for one ArtNet fixture entry."""
     artnet_helper: "ArtNetDMXHelper" = hass.data[DOMAIN][entry.entry_id]
     dmx_writer = DMXWriter(artnet_helper)
-    entities = []
+    entities: list[ArtNetDMXSelect] = []
 
     try:
+        fixture = get_fixture_entry(entry)
         mapping = load_fixture_mapping()
-        fixtures = get_entry_fixtures(entry)
-        for fixture in fixtures:
-            fixture_type = fixture["fixture_type"]
-            start_channel = fixture["start_channel"]
-            fixture_id = fixture["id"]
-            fixture_def = mapping.get("fixtures", {}).get(fixture_type)
-            if not fixture_def:
-                LOGGER.warning("Fixture type %s not found for entry %s", fixture_type, entry.entry_id)
+        fixture_type = fixture[CONF_FIXTURE_TYPE]
+        start_channel = int(fixture[CONF_START_CHANNEL])
+        fixture_id = fixture[CONF_FIXTURE_ID]
+        fixture_def = mapping.get("fixtures", {}).get(fixture_type)
+        if not fixture_def:
+            LOGGER.warning("Fixture type %s not found for entry %s", fixture_type, entry.entry_id)
+            return
+
+        fixture_label = (
+            fixture.get(CONF_NAME)
+            or fixture_def.get("label")
+            or getattr(entry, "title", None)
+            or fixture_type
+            or entry.entry_id
+        )
+
+        for channel in fixture_def.get("channels", []):
+            if "value_map" not in channel:
                 continue
-            entity_fixture_label = (
-                get_fixture_label(fixture, fixture_def.get("label"))
-                or entry.data.get("name")
-                or getattr(entry, "title", None)
-                or fixture_type
-                or entry.entry_id
-            )
-            channels = fixture_def.get("channels", [])
-            for channel in channels:
-                if "value_map" not in channel:
-                    continue
-                offset = channel.get("offset")
-                abs_channel = int(start_channel) + int(offset) - 1
-                entities.append(
-                    ArtNetDMXSelect(
-                        artnet_helper=artnet_helper,
-                        dmx_writer=dmx_writer,
-                        channel=abs_channel,
-                        entry_id=entry.entry_id,
-                        fixture_id=fixture_id,
-                        channel_name=channel.get("name"),
-                        value_map=channel.get("value_map", {}),
-                        hidden_by_default=bool(channel.get("hidden_by_default", False)),
-                        fixture_label=entity_fixture_label,
-                    )
+            offset = int(channel["offset"])
+            entities.append(
+                ArtNetDMXSelect(
+                    artnet_helper=artnet_helper,
+                    dmx_writer=dmx_writer,
+                    channel=start_channel + offset - 1,
+                    entry_id=entry.entry_id,
+                    fixture_id=fixture_id,
+                    channel_name=channel.get("name"),
+                    value_map=channel.get("value_map", {}),
+                    hidden_by_default=bool(channel.get("hidden_by_default", False)),
+                    fixture_label=fixture_label,
                 )
+            )
     except HomeAssistantError:
         LOGGER.exception("Failed to load fixture mapping for select platform")
 
@@ -154,16 +156,13 @@ class ArtNetDMXSelect(SelectEntity):
         try:
             self.async_write_ha_state()
         except RuntimeError:
-            # In tests the entity may not be registered with hass; ignore
             pass
 
     @property
     def is_on(self) -> bool:
-        """Return whether the select is considered "on" for light service compatibility."""
         return bool(self._is_on)
 
     async def async_turn_on(self, **_kwargs: Any) -> None:
-        """Handle light.turn_on calls against this entity by marking it on."""
         self._is_on = True
         try:
             self.async_write_ha_state()
@@ -171,7 +170,6 @@ class ArtNetDMXSelect(SelectEntity):
             pass
 
     async def async_turn_off(self, **_kwargs: Any) -> None:
-        """Handle light.turn_off calls against this entity by marking it off."""
         self._is_on = False
         try:
             self.async_write_ha_state()
