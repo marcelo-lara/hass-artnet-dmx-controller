@@ -7,9 +7,11 @@ from typing import Any, TYPE_CHECKING
 from homeassistant.components.select import SelectEntity
 from homeassistant.helpers.device_registry import DeviceInfo
 
-from .channel_math import clamp_dmx_value, value_from_label
+from .channel_math import clamp_dmx_value, label_from_value, value_from_label
 from .const import DOMAIN, LOGGER
 from .dmx_writer import DMXWriter
+from .entry_fixtures import fixture_label as get_fixture_label
+from .entry_fixtures import get_entry_fixtures
 from .fixture_mapping import HomeAssistantError, load_fixture_mapping
 
 
@@ -32,41 +34,45 @@ async def async_setup_entry(hass: "HomeAssistant", entry: "ConfigEntry", async_a
     dmx_writer = DMXWriter(artnet_helper)
     entities = []
 
-    fixture_type = entry.data.get("fixture_type")
-    start_channel = entry.data.get("start_channel")
-    channel_count = entry.data.get("channel_count")
-
-    if fixture_type and start_channel and channel_count:
-        try:
-            mapping = load_fixture_mapping()
+    try:
+        mapping = load_fixture_mapping()
+        fixtures = get_entry_fixtures(entry)
+        for fixture in fixtures:
+            fixture_type = fixture["fixture_type"]
+            start_channel = fixture["start_channel"]
+            fixture_id = fixture["id"]
             fixture_def = mapping.get("fixtures", {}).get(fixture_type)
-            if fixture_def:
-                fixture_label = (
-                    fixture_def.get("label")
-                    or entry.data.get("name")
-                    or getattr(entry, "title", None)
-                    or fixture_type
-                    or entry.entry_id
+            if not fixture_def:
+                LOGGER.warning("Fixture type %s not found for entry %s", fixture_type, entry.entry_id)
+                continue
+            entity_fixture_label = (
+                get_fixture_label(fixture, fixture_def.get("label"))
+                or entry.data.get("name")
+                or getattr(entry, "title", None)
+                or fixture_type
+                or entry.entry_id
+            )
+            channels = fixture_def.get("channels", [])
+            for channel in channels:
+                if "value_map" not in channel:
+                    continue
+                offset = channel.get("offset")
+                abs_channel = int(start_channel) + int(offset) - 1
+                entities.append(
+                    ArtNetDMXSelect(
+                        artnet_helper=artnet_helper,
+                        dmx_writer=dmx_writer,
+                        channel=abs_channel,
+                        entry_id=entry.entry_id,
+                        fixture_id=fixture_id,
+                        channel_name=channel.get("name"),
+                        value_map=channel.get("value_map", {}),
+                        hidden_by_default=bool(channel.get("hidden_by_default", False)),
+                        fixture_label=entity_fixture_label,
+                    )
                 )
-                channels = fixture_def.get("channels", [])
-                for ch in channels:
-                    if "value_map" in ch:
-                        offset = ch.get("offset")
-                        abs_channel = int(start_channel) + int(offset) - 1
-                        entities.append(
-                            ArtNetDMXSelect(
-                                artnet_helper=artnet_helper,
-                                dmx_writer=dmx_writer,
-                                channel=abs_channel,
-                                entry_id=entry.entry_id,
-                                channel_name=ch.get("name"),
-                                value_map=ch.get("value_map", {}),
-                                hidden_by_default=bool(ch.get("hidden_by_default", False)),
-                                fixture_label=fixture_label,
-                            )
-                        )
-        except HomeAssistantError:
-            LOGGER.exception("Failed to load fixture mapping for select platform")
+    except HomeAssistantError:
+        LOGGER.exception("Failed to load fixture mapping for select platform")
 
     if entities:
         async_add_entities(entities)
@@ -82,6 +88,7 @@ class ArtNetDMXSelect(SelectEntity):
         artnet_helper,
         channel: int,
         entry_id: str,
+        fixture_id: str,
         channel_name: str | None = None,
         value_map: dict | None = None,
         hidden_by_default: bool = False,
@@ -92,7 +99,7 @@ class ArtNetDMXSelect(SelectEntity):
         self._dmx_writer = dmx_writer
         self._channel = channel
         self._value_map = value_map or {}
-        self._attr_unique_id = f"{entry_id}_channel_{channel}"
+        self._attr_unique_id = f"{entry_id}_{fixture_id}_channel_{channel}"
         human_label = _humanize(fixture_label) or fixture_label
         human_channel = _humanize(channel_name) or channel_name
         if human_label and human_channel:
@@ -104,7 +111,13 @@ class ArtNetDMXSelect(SelectEntity):
         else:
             self._attr_name = f"DMX Channel {channel}"
         self._attr_entity_registry_enabled_default = not bool(hidden_by_default)
-        self._current = None
+        current_value = _channel_value(artnet_helper, channel)
+        current_label = label_from_value(self._value_map, current_value)
+        self._synthetic_options: dict[str, int] = {}
+        if current_label is None:
+            current_label = f"Value {current_value}"
+            self._synthetic_options[current_label] = current_value
+        self._current = current_label
         self._is_on = False
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry_id)},
@@ -114,7 +127,11 @@ class ArtNetDMXSelect(SelectEntity):
 
     @property
     def options(self) -> list[str]:
-        return list(self._value_map.values())
+        options = list(self._value_map.values())
+        for label in self._synthetic_options:
+            if label not in options:
+                options.append(label)
+        return options
 
     @property
     def current_option(self) -> str | None:
@@ -122,7 +139,10 @@ class ArtNetDMXSelect(SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         try:
-            value = value_from_label(self._value_map, option)
+            if option in self._synthetic_options:
+                value = self._synthetic_options[option]
+            else:
+                value = value_from_label(self._value_map, option)
             value = clamp_dmx_value(value)
         except Exception:
             return
@@ -157,3 +177,13 @@ class ArtNetDMXSelect(SelectEntity):
             self.async_write_ha_state()
         except RuntimeError:
             pass
+
+
+def _channel_value(artnet_helper, channel: int) -> int:
+    """Read a buffered DMX value when available, defaulting to 0."""
+    if hasattr(artnet_helper, "get_channel_value"):
+        try:
+            return int(artnet_helper.get_channel_value(channel))
+        except Exception:
+            return 0
+    return 0

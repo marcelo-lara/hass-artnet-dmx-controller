@@ -8,13 +8,24 @@ from typing import Any
 import voluptuous as vol
 from homeassistant import config_entries
 
-from .channel_math import absolute_channel
 from .const import (
+    CONF_FIXTURE_ID,
+    CONF_FIXTURE_TYPE,
+    CONF_FIXTURES,
+    CONF_NAME,
+    CONF_START_CHANNEL,
     CONF_TARGET_IP,
     CONF_UNIVERSE,
     DEFAULT_UNIVERSE,
     DOMAIN,
     MAX_UNIVERSE,
+)
+from .entry_fixtures import (
+    build_fixture_config,
+    get_entry_fixtures,
+    normalize_entry_data,
+    validate_fixture_channels,
+    validate_fixture_overlap,
 )
 from .fixture_mapping import HomeAssistantError, load_fixture_mapping
 
@@ -22,7 +33,7 @@ from .fixture_mapping import HomeAssistantError, load_fixture_mapping
 class ArtNetDMXControllerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for ArtNet DMX Controller."""
 
-    VERSION = 1
+    VERSION = 2
 
     async def async_step_user(
         self,
@@ -31,77 +42,34 @@ class ArtNetDMXControllerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle the initial step."""
         errors: dict[str, str] = {}
 
-        # Load fixture mapping for fixture type choices; non-fatal if missing
-        fixture_choices = {}
-        try:
-            mapping = load_fixture_mapping()
-            fixture_choices = {k: k for k in mapping.get("fixtures", {}).keys()}
-        except HomeAssistantError:
-            # Mapping not available — present no fixture choices and allow only controller config
-            mapping = None
-
         if user_input is not None:
-            # Validate the input
             target_ip = user_input[CONF_TARGET_IP]
             universe = user_input[CONF_UNIVERSE]
-            fixture_type = user_input.get("fixture_type")
-            start_channel = user_input.get("start_channel")
 
-            # Validate IP address format
             try:
                 ipaddress.ip_address(target_ip)
             except ValueError:
                 errors["base"] = "invalid_ip"
             else:
-                # Validate universe range
                 if not 0 <= universe <= MAX_UNIVERSE:
                     errors["base"] = "invalid_universe"
                 else:
-                    # Validate fixture fields if provided
-                    if fixture_type is None or start_channel is None:
-                        errors["base"] = "missing_fixture"
-                    # Validate fixture_type is known
-                    elif mapping is None or fixture_type not in mapping.get("fixtures", {}):
-                        errors["base"] = "unknown_fixture_type"
-                    else:
-                        channel_count = mapping["fixtures"][fixture_type]["channel_count"]
-                        try:
-                            absolute_channel(start_channel, channel_count)
-                        except HomeAssistantError:
-                            errors["base"] = "invalid_channel_range"
-
-                    # Check overlap with existing config entries that include start/channel_count
-                    if not errors:
-                        for entry in self._async_current_entries():
-                            ed = entry.data
-                            if "start_channel" in ed and "channel_count" in ed:
-                                s1 = ed["start_channel"]
-                                e1 = s1 + ed["channel_count"] - 1
-                                s2 = start_channel
-                                e2 = start_channel + channel_count - 1
-                                if not (e1 < s2 or e2 < s1):
-                                    errors["base"] = "channel_overlap"
-
-                    # Create a unique ID based on IP and universe
                     await self.async_set_unique_id(f"{target_ip}_{universe}")
                     self._abort_if_unique_id_configured()
 
-                    if errors:
-                        # fall through to show form with errors
-                        pass
-                    else:
-                        # Persist fixture fields into the entry data
-                        entry_data = dict(user_input)
-                        # ensure start_channel, fixture_type and channel_count are saved
-                        entry_data["start_channel"] = int(start_channel)
-                        entry_data["fixture_type"] = fixture_type
-                        entry_data["channel_count"] = int(channel_count)
+                    if not errors:
+                        entry_data = {
+                            CONF_TARGET_IP: target_ip,
+                            CONF_UNIVERSE: int(universe),
+                            CONF_FIXTURES: [],
+                        }
+                        if user_input.get(CONF_NAME):
+                            entry_data[CONF_NAME] = user_input[CONF_NAME].strip()
                         return self.async_create_entry(
                             title=f"ArtNet DMX ({target_ip} U:{universe})",
                             data=entry_data,
                         )
 
-        # Build form including fixture fields if mapping available
         schema_fields = {
             vol.Required(
                 CONF_TARGET_IP,
@@ -111,16 +79,8 @@ class ArtNetDMXControllerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_UNIVERSE,
                 default=(user_input or {}).get(CONF_UNIVERSE, DEFAULT_UNIVERSE),
             ): vol.All(vol.Coerce(int), vol.Range(min=0, max=MAX_UNIVERSE)),
+            vol.Optional(CONF_NAME, default=(user_input or {}).get(CONF_NAME, "")): str,
         }
-
-        if fixture_choices:
-            schema_fields[vol.Required("fixture_type", default=(user_input or {}).get("fixture_type"))] = vol.In(
-                list(fixture_choices.keys())
-            )
-            schema_fields[vol.Required("start_channel", default=(user_input or {}).get("start_channel"))] = vol.All(
-                vol.Coerce(int), vol.Range(min=1, max=512)
-            )
-            schema_fields[vol.Optional("name", default=(user_input or {}).get("name"))] = str
 
         data_schema = vol.Schema(schema_fields)
 
@@ -135,18 +95,26 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     """Handle options for ArtNet DMX Controller config entries."""
 
     def __init__(self, config_entry):
-        self.config_entry = config_entry
+        self._entry = config_entry
+        self.handler = config_entry.entry_id
+        self._mapping = None
+        self._editing_fixture_id: str | None = None
 
     async def async_step_init(self, user_input=None):
-        """Manage options: default transition and scene exposure."""
+        """Present available options actions."""
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=["node_options", "add_fixture", "edit_fixture", "remove_fixture"],
+        )
+
+    async def async_step_node_options(self, user_input=None):
+        """Manage non-entity options."""
         errors = {}
 
         if user_input is not None:
-            # Persist options
             return self.async_create_entry(title="", data=user_input)
 
-        # Present current options with defaults
-        opts = self.config_entry.options or {}
+        opts = self._entry.options or {}
         data_schema = vol.Schema(
             {
                 vol.Optional("default_transition", default=opts.get("default_transition", 0)):
@@ -155,7 +123,179 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             }
         )
 
-        return self.async_show_form(step_id="init", data_schema=data_schema, errors=errors)
+        return self.async_show_form(step_id="node_options", data_schema=data_schema, errors=errors)
+
+    async def async_step_add_fixture(self, user_input=None):
+        """Add a fixture to an existing node/universe entry."""
+        errors: dict[str, str] = {}
+        mapping = self._get_mapping()
+        fixture_choices = {k: k for k in mapping.get("fixtures", {}).keys()}
+
+        if user_input is not None:
+            fixture_type = user_input[CONF_FIXTURE_TYPE]
+            fixture_def = mapping.get("fixtures", {}).get(fixture_type)
+            if fixture_def is None:
+                errors["base"] = "unknown_fixture_type"
+            else:
+                fixture = build_fixture_config(
+                    fixture_type=fixture_type,
+                    start_channel=int(user_input[CONF_START_CHANNEL]),
+                    channel_count=int(fixture_def["channel_count"]),
+                    name=user_input.get(CONF_NAME),
+                )
+                try:
+                    validate_fixture_channels(fixture)
+                    validate_fixture_overlap(get_entry_fixtures(self._entry), fixture)
+                except HomeAssistantError as err:
+                    if str(err) == "channel_overlap":
+                        errors["base"] = "channel_overlap"
+                    else:
+                        errors["base"] = "invalid_channel_range"
+
+                if not errors:
+                    updated_data = normalize_entry_data(self._entry.data)
+                    updated_data[CONF_FIXTURES].append(fixture)
+                    self.hass.config_entries.async_update_entry(self._entry, data=updated_data)
+                    await self.hass.config_entries.async_reload(self._entry.entry_id)
+                    return self.async_create_entry(title="", data=self._entry.options)
+
+        data_schema = vol.Schema(
+            {
+                vol.Required(CONF_FIXTURE_TYPE, default=(user_input or {}).get(CONF_FIXTURE_TYPE)): vol.In(
+                    list(fixture_choices.keys())
+                ),
+                vol.Required(CONF_START_CHANNEL, default=(user_input or {}).get(CONF_START_CHANNEL, 1)): vol.All(
+                    vol.Coerce(int), vol.Range(min=1, max=512)
+                ),
+                vol.Optional(CONF_NAME, default=(user_input or {}).get(CONF_NAME, "")): str,
+            }
+        )
+        return self.async_show_form(step_id="add_fixture", data_schema=data_schema, errors=errors)
+
+    async def async_step_remove_fixture(self, user_input=None):
+        """Remove one fixture from the entry."""
+        fixtures = get_entry_fixtures(self._entry)
+        if not fixtures:
+            return self.async_abort(reason="no_fixtures")
+
+        if user_input is not None:
+            fixture_id = user_input[CONF_FIXTURE_ID]
+            updated_data = normalize_entry_data(self._entry.data)
+            updated_data[CONF_FIXTURES] = [
+                fixture for fixture in updated_data[CONF_FIXTURES] if fixture.get(CONF_FIXTURE_ID) != fixture_id
+            ]
+            self.hass.config_entries.async_update_entry(self._entry, data=updated_data)
+            await self.hass.config_entries.async_reload(self._entry.entry_id)
+            return self.async_create_entry(title="", data=self._entry.options)
+
+        fixture_choices = {
+            fixture[CONF_FIXTURE_ID]: (
+                f"{fixture.get(CONF_NAME) or fixture[CONF_FIXTURE_TYPE]} @ CH {fixture[CONF_START_CHANNEL]}"
+            )
+            for fixture in fixtures
+        }
+        data_schema = vol.Schema({vol.Required(CONF_FIXTURE_ID): vol.In(fixture_choices)})
+        return self.async_show_form(step_id="remove_fixture", data_schema=data_schema, errors={})
+
+    async def async_step_edit_fixture(self, user_input=None):
+        """Select a fixture to edit."""
+        fixtures = get_entry_fixtures(self._entry)
+        if not fixtures:
+            return self.async_abort(reason="no_fixtures")
+
+        if user_input is not None:
+            self._editing_fixture_id = user_input[CONF_FIXTURE_ID]
+            return await self.async_step_edit_fixture_details()
+
+        fixture_choices = {
+            fixture[CONF_FIXTURE_ID]: (
+                f"{fixture.get(CONF_NAME) or fixture[CONF_FIXTURE_TYPE]} @ CH {fixture[CONF_START_CHANNEL]}"
+            )
+            for fixture in fixtures
+        }
+        data_schema = vol.Schema({vol.Required(CONF_FIXTURE_ID): vol.In(fixture_choices)})
+        return self.async_show_form(step_id="edit_fixture", data_schema=data_schema, errors={})
+
+    async def async_step_edit_fixture_details(self, user_input=None):
+        """Edit one existing fixture."""
+        fixtures = get_entry_fixtures(self._entry)
+        if not fixtures:
+            return self.async_abort(reason="no_fixtures")
+
+        fixture = next(
+            (item for item in fixtures if item.get(CONF_FIXTURE_ID) == self._editing_fixture_id),
+            None,
+        )
+        if fixture is None:
+            return self.async_abort(reason="no_fixtures")
+
+        errors: dict[str, str] = {}
+        mapping = self._get_mapping()
+        fixture_choices = {key: key for key in mapping.get("fixtures", {}).keys()}
+
+        if user_input is not None:
+            fixture_type = user_input[CONF_FIXTURE_TYPE]
+            fixture_def = mapping.get("fixtures", {}).get(fixture_type)
+            if fixture_def is None:
+                errors["base"] = "unknown_fixture_type"
+            else:
+                updated_fixture = build_fixture_config(
+                    fixture_type=fixture_type,
+                    start_channel=int(user_input[CONF_START_CHANNEL]),
+                    channel_count=int(fixture_def["channel_count"]),
+                    name=user_input.get(CONF_NAME),
+                    fixture_id=fixture[CONF_FIXTURE_ID],
+                )
+                try:
+                    validate_fixture_channels(updated_fixture)
+                    validate_fixture_overlap(
+                        fixtures,
+                        updated_fixture,
+                        exclude_fixture_id=fixture[CONF_FIXTURE_ID],
+                    )
+                except HomeAssistantError as err:
+                    if str(err) == "channel_overlap":
+                        errors["base"] = "channel_overlap"
+                    else:
+                        errors["base"] = "invalid_channel_range"
+
+                if not errors:
+                    updated_data = normalize_entry_data(self._entry.data)
+                    updated_data[CONF_FIXTURES] = [
+                        updated_fixture if item.get(CONF_FIXTURE_ID) == fixture[CONF_FIXTURE_ID] else item
+                        for item in updated_data[CONF_FIXTURES]
+                    ]
+                    self.hass.config_entries.async_update_entry(self._entry, data=updated_data)
+                    await self.hass.config_entries.async_reload(self._entry.entry_id)
+                    return self.async_create_entry(title="", data=self._entry.options)
+
+        data_schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_FIXTURE_TYPE,
+                    default=(user_input or {}).get(CONF_FIXTURE_TYPE, fixture[CONF_FIXTURE_TYPE]),
+                ): vol.In(list(fixture_choices.keys())),
+                vol.Required(
+                    CONF_START_CHANNEL,
+                    default=(user_input or {}).get(CONF_START_CHANNEL, fixture[CONF_START_CHANNEL]),
+                ): vol.All(vol.Coerce(int), vol.Range(min=1, max=512)),
+                vol.Optional(
+                    CONF_NAME,
+                    default=(user_input or {}).get(CONF_NAME, fixture.get(CONF_NAME, "")),
+                ): str,
+            }
+        )
+        return self.async_show_form(
+            step_id="edit_fixture_details",
+            data_schema=data_schema,
+            errors=errors,
+        )
+
+    def _get_mapping(self) -> dict[str, Any]:
+        """Load and cache fixture mapping for options steps."""
+        if self._mapping is None:
+            self._mapping = load_fixture_mapping()
+        return self._mapping
 
 
 async def async_get_options_flow(config_entry):

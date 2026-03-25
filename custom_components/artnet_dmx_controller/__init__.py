@@ -15,7 +15,8 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 
 from .artnet import ArtNetDMXHelper
-from .const import CONF_TARGET_IP, CONF_UNIVERSE, DOMAIN, LOGGER
+from .const import CONF_FIXTURES, CONF_TARGET_IP, CONF_UNIVERSE, DOMAIN, LOGGER
+from .entry_fixtures import get_entry_fixtures, normalize_entry_data
 from .scene.scene_store import SceneStore
 from .scene_services import async_play_scene, async_record_scene
 
@@ -35,6 +36,21 @@ PLATFORMS: list[Platform] = [
 ]
 
 
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate old single-fixture entries to the fixtures-list model."""
+    if entry.version >= 2:
+        return True
+
+    if entry.version == 1:
+        updated_data = normalize_entry_data(entry.data)
+        hass.config_entries.async_update_entry(entry, data=updated_data, version=2)
+        LOGGER.info("Migrated ArtNet DMX entry %s to version 2", entry.entry_id)
+        return True
+
+    LOGGER.error("Unsupported ArtNet DMX entry version %s", entry.version)
+    return False
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -52,6 +68,7 @@ async def async_setup_entry(
 
     # Setup the socket
     artnet_helper.setup_socket()
+    await artnet_helper.async_send_current_state()
 
     # Store the helper in hass.data
     hass.data.setdefault(DOMAIN, {})
@@ -60,17 +77,22 @@ async def async_setup_entry(
     # Create/update a device registry entry so the integration appears under Devices
     # even if entities are disabled or not yet added.
     try:
-        fixture_type = entry.data.get("fixture_type")
         device_name = (
             entry.data.get("name")
             or getattr(entry, "title", None)
             or f"ArtNet DMX ({target_ip} U:{universe})"
         )
+        fixtures = get_entry_fixtures(entry)
+        model = "DMX Node"
+        if len(fixtures) == 1:
+            model = fixtures[0].get("fixture_type") or model
+        elif fixtures:
+            model = f"DMX Node ({len(fixtures)} fixtures)"
         dr.async_get(hass).async_get_or_create(
             config_entry_id=entry.entry_id,
             identifiers={(DOMAIN, entry.entry_id)},
             manufacturer="Art-Net",
-            model=fixture_type or "DMX Controller",
+            model=model,
             name=device_name,
         )
     except Exception:  # pragma: no cover - best effort for non-HA/unit-test stubs

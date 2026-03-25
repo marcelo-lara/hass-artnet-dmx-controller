@@ -3,12 +3,13 @@ import importlib
 from types import SimpleNamespace
 
 integration_init = importlib.import_module("custom_components.artnet_dmx_controller")
-from custom_components.artnet_dmx_controller.const import DOMAIN
+from custom_components.artnet_dmx_controller.const import CONF_FIXTURES, DOMAIN
 from homeassistant.const import Platform
 
 # Avoid real socket operations in sandboxed/unit-test runs.
 integration_init.ArtNetDMXHelper.setup_socket = lambda self: None
 integration_init.ArtNetDMXHelper.close_socket = lambda self: None
+integration_init.ArtNetDMXHelper.async_send_current_state = lambda self: asyncio.sleep(0)
 
 
 def make_fake_hass(registrations):
@@ -101,8 +102,10 @@ def test_setup_registers_device():
     entry.data = {
         "target_ip": "127.0.0.1",
         "universe": 0,
-        "fixture_type": "parcan",
-        "name": "Parcan Left",
+        "name": "Stage Left Node",
+        CONF_FIXTURES: [
+            {"id": "fixture-1", "fixture_type": "parcan", "start_channel": 1, "channel_count": 5}
+        ],
     }
 
     created = []

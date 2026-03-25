@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Optional
 
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
@@ -16,7 +16,12 @@ from .channel_math import (
     absolute_channel,
     clamp_dmx_value,
 )
-from typing import Optional
+
+from .const import DOMAIN, LOGGER
+from .dmx_writer import DMXWriter
+from .entry_fixtures import fixture_label as get_fixture_label
+from .entry_fixtures import get_entry_fixtures
+from .fixture_mapping import HomeAssistantError, load_fixture_mapping
 
 
 def _humanize(text: Optional[str]) -> Optional[str]:
@@ -27,9 +32,6 @@ def _humanize(text: Optional[str]) -> Optional[str]:
     if not text:
         return None
     return str(text).replace("_", " ").strip().title()
-from .const import DEFAULT_CHANNEL_COUNT, DOMAIN, LOGGER
-from .dmx_writer import DMXWriter
-from .fixture_mapping import HomeAssistantError, load_fixture_mapping
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -46,164 +48,126 @@ async def async_setup_entry(
 ) -> None:
     """Set up ArtNet DMX light entities from a config entry."""
     artnet_helper: ArtNetDMXHelper = hass.data[DOMAIN][entry.entry_id]
-    # Create a centralized DMX writer for this config entry
     dmx_writer = DMXWriter(artnet_helper)
     entities = []
-
-    # If fixture metadata is present on the entry, create per-fixture channels
-    fixture_type = entry.data.get("fixture_type")
-    start_channel = entry.data.get("start_channel")
-    channel_count = entry.data.get("channel_count")
-
-    if fixture_type and start_channel and channel_count:
-        try:
-            mapping = load_fixture_mapping()
+    try:
+        mapping = load_fixture_mapping()
+        fixtures = get_entry_fixtures(entry)
+        for fixture in fixtures:
+            fixture_type = fixture["fixture_type"]
+            start_channel = fixture["start_channel"]
+            fixture_id = fixture["id"]
             fixture_def = mapping.get("fixtures", {}).get(fixture_type)
-            if fixture_def:
-                # derive a fixture label to use in entity display names
-                fixture_label = (
-                    fixture_def.get("label")
-                    or entry.data.get("name")
-                    or getattr(entry, "title", None)
-                    or fixture_type
-                    or entry.entry_id
-                )
-                # Build a name->channel mapping for group detection
-                channels = fixture_def.get("channels", [])
-                name_map = {ch.get("name"): ch for ch in channels}
+            if not fixture_def:
+                LOGGER.warning("Fixture type %s not found for entry %s", fixture_type, entry.entry_id)
+                continue
 
-                # Detect RGB fixture (has red, green, blue channels)
-                rgb_group = None
-                if all(n in name_map for n in ("red", "green", "blue")):
-                    # gather offsets
-                    rgb_group = {
-                        "red": name_map["red"]["offset"],
-                        "green": name_map["green"]["offset"],
-                        "blue": name_map["blue"]["offset"],
-                        "dim": name_map.get("dim", {}).get("offset"),
-                    }
-
-                # Detect 16-bit pairs (name_msB / name_lsb)
-                bit16_pairs: dict[str, tuple[int, int]] = {}
-                for nm, chdef in name_map.items():
-                    if nm.endswith("_msb"):
-                        base = nm[: -4]
-                        lsb_name = f"{base}_lsb"
-                        if lsb_name in name_map:
-                            bit16_pairs[base] = (chdef.get("offset"), name_map[lsb_name].get("offset"))
-
-                handled_offsets: set[int] = set()
-
-                # Reserve offsets for detected 16-bit pairs so they are not
-                # created as separate entities in the subsequent loop.
-                for base, (msb_off, lsb_off) in bit16_pairs.items():
-                    handled_offsets.update({msb_off, lsb_off})
-
-                # Create composite 16-bit entities for detected pairs
-                for base, (msb_off, lsb_off) in bit16_pairs.items():
-                    abs_msb = absolute_channel(int(start_channel), int(msb_off))
-                    abs_lsb = absolute_channel(int(start_channel), int(lsb_off))
-                    # prefer hidden flag from msb or lsb if present
-                    msb_def = name_map.get(f"{base}_msb", {})
-                    lsb_def = name_map.get(f"{base}_lsb", {})
-                    hidden = bool(msb_def.get("hidden_by_default", False) or lsb_def.get("hidden_by_default", False))
-                    entities.append(
-                        ArtNetDMX16BitLight(
-                            artnet_helper=artnet_helper,
-                            msb_channel=abs_msb,
-                            lsb_channel=abs_lsb,
-                            entry_id=entry.entry_id,
-                            channel_name=base,
-                            hidden_by_default=hidden,
-                            fixture_label=fixture_label,
-                            dmx_writer=dmx_writer,
-                        )
-                    )
-
-                for ch in channels:
-                    offset = ch.get("offset")
-                    # skip offsets handled by composite groups
-                    if offset in handled_offsets:
-                        continue
-
-                    # If this offset is part of RGB group, create composite entity
-                    if rgb_group and offset in (rgb_group["red"], rgb_group["green"], rgb_group["blue"]):
-                        # create RGB composite
-                        red_off = rgb_group["red"]
-                        green_off = rgb_group["green"]
-                        blue_off = rgb_group["blue"]
-                        dim_off = rgb_group.get("dim")
-                        # mark offsets as handled
-                        handled_offsets.update({red_off, green_off, blue_off})
-                        if dim_off:
-                            handled_offsets.add(dim_off)
-
-                        abs_red = absolute_channel(int(start_channel), int(red_off))
-                        abs_green = absolute_channel(int(start_channel), int(green_off))
-                        abs_blue = absolute_channel(int(start_channel), int(blue_off))
-                        abs_dim = None
-                        if dim_off:
-                            abs_dim = absolute_channel(int(start_channel), int(dim_off))
-
-                        entities.append(
-                            ArtNetDMXRGBLight(
-                                artnet_helper=artnet_helper,
-                                dmx_writer=dmx_writer,
-                                red_channel=abs_red,
-                                green_channel=abs_green,
-                                blue_channel=abs_blue,
-                                dim_channel=abs_dim,
-                                entry_id=entry.entry_id,
-                                channel_name=f"{fixture_type}",
-                                fixture_label=fixture_label,
-                            )
-                        )
-                        # continue to next channel
-                        continue
-
-                # after composite handling, create remaining entities
-                for ch in channels:
-                    offset = ch.get("offset")
-                    if offset in handled_offsets:
-                        continue
-                    name = ch.get("name")
-                    hidden = bool(ch.get("hidden_by_default", False))
-                    abs_channel = absolute_channel(int(start_channel), int(offset))
-                    # Select channels are created in select.py; keep light.py limited
-                    # to light entities to avoid cross-platform duplication/conflicts.
-                    if "value_map" in ch:
-                        continue
-
-                    entities.append(
-                        ArtNetDMXLight(
-                            artnet_helper=artnet_helper,
-                            dmx_writer=dmx_writer,
-                            channel=abs_channel,
-                            entry_id=entry.entry_id,
-                            channel_name=name,
-                            hidden_by_default=hidden,
-                            fixture_label=fixture_label,
-                        )
-                    )
-        except HomeAssistantError:
-            # Fallback to default behavior below
-            LOGGER.exception("Failed to load fixture mapping; falling back to default channels")
-
-    if not entities:
-        # Fallback: create default channel entities
-        fallback_label = entry.data.get("name") or getattr(entry, "title", None) or entry.entry_id
-        entities = [
-            ArtNetDMXLight(
-                artnet_helper=artnet_helper,
-                dmx_writer=dmx_writer,
-                channel=channel,
-                entry_id=entry.entry_id,
-                fixture_label=fallback_label,
+            entity_fixture_label = (
+                get_fixture_label(fixture, fixture_def.get("label"))
+                or entry.data.get("name")
+                or getattr(entry, "title", None)
+                or fixture_type
+                or entry.entry_id
             )
-            for channel in range(1, DEFAULT_CHANNEL_COUNT + 1)
-        ]
+            channels = fixture_def.get("channels", [])
+            name_map = {ch.get("name"): ch for ch in channels}
 
-    async_add_entities(entities)
+            rgb_group = None
+            if all(name in name_map for name in ("red", "green", "blue")):
+                rgb_group = {
+                    "red": name_map["red"]["offset"],
+                    "green": name_map["green"]["offset"],
+                    "blue": name_map["blue"]["offset"],
+                    "dim": name_map.get("dim", {}).get("offset"),
+                }
+
+            bit16_pairs: dict[str, tuple[int, int]] = {}
+            for name, channel_def in name_map.items():
+                if name.endswith("_msb"):
+                    base = name[:-4]
+                    lsb_name = f"{base}_lsb"
+                    if lsb_name in name_map:
+                        bit16_pairs[base] = (channel_def.get("offset"), name_map[lsb_name].get("offset"))
+
+            handled_offsets: set[int] = set()
+            for msb_offset, lsb_offset in bit16_pairs.values():
+                handled_offsets.update({msb_offset, lsb_offset})
+
+            for base, (msb_offset, lsb_offset) in bit16_pairs.items():
+                abs_msb = absolute_channel(int(start_channel), int(msb_offset))
+                abs_lsb = absolute_channel(int(start_channel), int(lsb_offset))
+                msb_def = name_map.get(f"{base}_msb", {})
+                lsb_def = name_map.get(f"{base}_lsb", {})
+                hidden = bool(msb_def.get("hidden_by_default", False) or lsb_def.get("hidden_by_default", False))
+                entities.append(
+                    ArtNetDMX16BitLight(
+                        artnet_helper=artnet_helper,
+                        msb_channel=abs_msb,
+                        lsb_channel=abs_lsb,
+                        entry_id=entry.entry_id,
+                        fixture_id=fixture_id,
+                        channel_name=base,
+                        hidden_by_default=hidden,
+                        fixture_label=entity_fixture_label,
+                        dmx_writer=dmx_writer,
+                    )
+                )
+
+            for channel in channels:
+                offset = channel.get("offset")
+                if offset in handled_offsets:
+                    continue
+                if rgb_group and offset in (rgb_group["red"], rgb_group["green"], rgb_group["blue"]):
+                    red_offset = rgb_group["red"]
+                    green_offset = rgb_group["green"]
+                    blue_offset = rgb_group["blue"]
+                    dim_offset = rgb_group.get("dim")
+                    handled_offsets.update({red_offset, green_offset, blue_offset})
+                    if dim_offset:
+                        handled_offsets.add(dim_offset)
+                    abs_red = absolute_channel(int(start_channel), int(red_offset))
+                    abs_green = absolute_channel(int(start_channel), int(green_offset))
+                    abs_blue = absolute_channel(int(start_channel), int(blue_offset))
+                    abs_dim = absolute_channel(int(start_channel), int(dim_offset)) if dim_offset else None
+                    entities.append(
+                        ArtNetDMXRGBLight(
+                            artnet_helper=artnet_helper,
+                            dmx_writer=dmx_writer,
+                            red_channel=abs_red,
+                            green_channel=abs_green,
+                            blue_channel=abs_blue,
+                            dim_channel=abs_dim,
+                            entry_id=entry.entry_id,
+                            fixture_id=fixture_id,
+                            channel_name=fixture_type,
+                            fixture_label=entity_fixture_label,
+                        )
+                    )
+
+            for channel in channels:
+                offset = channel.get("offset")
+                if offset in handled_offsets:
+                    continue
+                if "value_map" in channel:
+                    continue
+                abs_channel = absolute_channel(int(start_channel), int(offset))
+                entities.append(
+                    ArtNetDMXLight(
+                        artnet_helper=artnet_helper,
+                        dmx_writer=dmx_writer,
+                        channel=abs_channel,
+                        entry_id=entry.entry_id,
+                        fixture_id=fixture_id,
+                        channel_name=channel.get("name"),
+                        hidden_by_default=bool(channel.get("hidden_by_default", False)),
+                        fixture_label=entity_fixture_label,
+                    )
+                )
+    except HomeAssistantError:
+        LOGGER.exception("Failed to load fixture mapping for light platform")
+
+    if entities:
+        async_add_entities(entities)
 
 
 class ArtNetDMXLight(LightEntity):
@@ -219,6 +183,7 @@ class ArtNetDMXLight(LightEntity):
         artnet_helper: ArtNetDMXHelper,
         channel: int,
         entry_id: str,
+        fixture_id: str,
         channel_name: str | None = None,
         hidden_by_default: bool = False,
         dmx_writer: DMXWriter | None = None,
@@ -234,11 +199,9 @@ class ArtNetDMXLight(LightEntity):
 
         """
         self._artnet_helper = artnet_helper
-        # Prefer using the centralized DMX writer when provided
         self._dmx_writer = dmx_writer
         self._channel = channel
-        # Unique id includes the absolute channel number to keep stability
-        self._attr_unique_id = f"{entry_id}_channel_{channel}"
+        self._attr_unique_id = f"{entry_id}_{fixture_id}_channel_{channel}"
         human_label = _humanize(fixture_label) or fixture_label
         human_channel = _humanize(channel_name) or channel_name
         if human_label and human_channel:
@@ -257,8 +220,9 @@ class ArtNetDMXLight(LightEntity):
             name=fixture_label or f"{entry_id} Fixture",
         )
         self._attr_icon = "mdi:lightbulb"
-        self._is_on = False
-        self._brightness = 0
+        initial_value = _channel_value(artnet_helper, channel)
+        self._is_on = initial_value > 0
+        self._brightness = initial_value
 
     @property
     def is_on(self) -> bool:
@@ -331,6 +295,7 @@ class ArtNetDMXRGBLight(LightEntity):
         blue_channel: int,
         dim_channel: int | None,
         entry_id: str,
+        fixture_id: str,
         channel_name: str | None = None,
         dmx_writer: DMXWriter | None = None,
         fixture_label: str | None = None,
@@ -341,7 +306,7 @@ class ArtNetDMXRGBLight(LightEntity):
         self._green = green_channel
         self._blue = blue_channel
         self._dim = dim_channel
-        self._attr_unique_id = f"{entry_id}_rgb_{self._red}_{self._green}_{self._blue}"
+        self._attr_unique_id = f"{entry_id}_{fixture_id}_rgb_{self._red}_{self._green}_{self._blue}"
         human_label = _humanize(fixture_label) or fixture_label
         human_channel = _humanize(channel_name) or channel_name
         if human_label and human_channel:
@@ -357,9 +322,15 @@ class ArtNetDMXRGBLight(LightEntity):
             name=fixture_label or f"{entry_id} Fixture",
         )
         self._attr_icon = "mdi:led-strip-variant"
-        self._is_on = False
-        self._brightness = 0
-        self._rgb = (0, 0, 0)
+        red_value = _channel_value(artnet_helper, self._red)
+        green_value = _channel_value(artnet_helper, self._green)
+        blue_value = _channel_value(artnet_helper, self._blue)
+        if self._dim is not None:
+            self._brightness = _channel_value(artnet_helper, self._dim)
+        else:
+            self._brightness = max(red_value, green_value, blue_value)
+        self._rgb = (red_value, green_value, blue_value)
+        self._is_on = any(self._rgb) or self._brightness > 0
 
     @property
     def is_on(self) -> bool:
@@ -452,6 +423,7 @@ class ArtNetDMX16BitLight(LightEntity):
         msb_channel: int,
         lsb_channel: int,
         entry_id: str,
+        fixture_id: str,
         channel_name: str | None = None,
         hidden_by_default: bool = False,
         dmx_writer: DMXWriter | None = None,
@@ -461,7 +433,7 @@ class ArtNetDMX16BitLight(LightEntity):
         self._dmx_writer = dmx_writer
         self._msb = msb_channel
         self._lsb = lsb_channel
-        self._attr_unique_id = f"{entry_id}_channel_{self._msb}_{self._lsb}"
+        self._attr_unique_id = f"{entry_id}_{fixture_id}_channel_{self._msb}_{self._lsb}"
         human_label = _humanize(fixture_label) or fixture_label
         human_channel = _humanize(channel_name) or channel_name
         if human_label and human_channel:
@@ -478,8 +450,21 @@ class ArtNetDMX16BitLight(LightEntity):
             name=fixture_label or f"{entry_id} Fixture",
         )
         self._attr_icon = "mdi:lightbulb"
-        self._is_on = False
-        self._brightness = 0
+        msb_value = _channel_value(artnet_helper, self._msb)
+        lsb_value = _channel_value(artnet_helper, self._lsb)
+        initial_16bit = (msb_value << 8) | lsb_value
+        self._brightness = initial_16bit // 257
+        self._is_on = initial_16bit > 0
+
+
+def _channel_value(artnet_helper: ArtNetDMXHelper, channel: int) -> int:
+    """Read a buffered DMX value when the helper exposes one."""
+    if hasattr(artnet_helper, "get_channel_value"):
+        try:
+            return int(artnet_helper.get_channel_value(channel))
+        except Exception:
+            return 0
+    return 0
 
     @property
     def is_on(self) -> bool:

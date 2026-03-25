@@ -46,7 +46,14 @@ def test_hidden_by_default_sets_entity_registry_enabled_default():
     light_mod.load_fixture_mapping = lambda: mapping
 
     try:
-        entry = SimpleNamespace(entry_id=entry_id, data={"fixture_type": "mix", "start_channel": 5, "channel_count": 3})
+        entry = SimpleNamespace(
+            entry_id=entry_id,
+            data={
+                "fixtures": [
+                    {"id": "fixture-mix", "fixture_type": "mix", "start_channel": 5, "channel_count": 3}
+                ]
+            },
+        )
 
         added = []
 

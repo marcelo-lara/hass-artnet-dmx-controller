@@ -9,9 +9,13 @@ from custom_components.artnet_dmx_controller.light import (
 class DummyArtNetHelper:
     def __init__(self):
         self.sent = []
+        self._dmx_data = bytearray(512)
 
     async def set_channel(self, channel: int, value: int):
         self.sent.append((channel, value))
+
+    def get_channel_value(self, channel: int):
+        return self._dmx_data[channel - 1]
 
 
 class DummyEntry:
@@ -33,7 +37,14 @@ def test_async_setup_entry_creates_fixture_entities():
     hass.data[domain][entry_id] = helper
 
     # Use a known fixture type from the bundled mapping: 'parcan' (5 channels)
-    entry = DummyEntry(entry_id, {"fixture_type": "parcan", "start_channel": 10, "channel_count": 5})
+    entry = DummyEntry(
+        entry_id,
+        {
+            "fixtures": [
+                {"id": "fixture-1", "fixture_type": "parcan", "start_channel": 10, "channel_count": 5}
+            ]
+        },
+    )
 
     added = []
 
@@ -73,7 +84,11 @@ def test_async_setup_entry_skips_value_map_channels_in_light_platform():
     # created only by the select platform, not light platform.
     entry = DummyEntry(
         entry_id,
-        {"fixture_type": "mini_beam_prism", "start_channel": 1, "channel_count": 12},
+        {
+            "fixtures": [
+                {"id": "fixture-1", "fixture_type": "mini_beam_prism", "start_channel": 1, "channel_count": 12}
+            ]
+        },
     )
 
     added = []
@@ -90,3 +105,34 @@ def test_async_setup_entry_skips_value_map_channels_in_light_platform():
     assert len(added) == 8
     # Select entities should not be created by light.py
     assert all(e.__class__.__name__ != "ArtNetDMXSelect" for e in added)
+
+
+def test_async_setup_entry_supports_multiple_fixtures_in_one_entry():
+    hass = SimpleNamespace()
+    hass.data = {}
+
+    helper = DummyArtNetHelper()
+    domain = "artnet_dmx_controller"
+    entry_id = "test-entry-multi"
+    hass.data.setdefault(domain, {})
+    hass.data[domain][entry_id] = helper
+
+    entry = DummyEntry(
+        entry_id,
+        {
+            "fixtures": [
+                {"id": "fixture-a", "fixture_type": "parcan", "start_channel": 1, "channel_count": 5},
+                {"id": "fixture-b", "fixture_type": "parcan", "start_channel": 10, "channel_count": 5},
+            ]
+        },
+    )
+
+    added = []
+
+    def async_add_entities(entities):
+        added.extend(entities)
+
+    asyncio.run(async_setup_entry(hass, entry, async_add_entities))
+
+    assert len(added) == 4
+    assert len({entity._attr_unique_id for entity in added}) == 4

@@ -119,6 +119,15 @@ class ArtNetDMXHelper:
         if self._socket is None:
             self.setup_socket()
 
+        if self._socket is None:
+            LOGGER.debug(
+                "Art-Net socket unavailable for %s:%s (Universe %s); skipping send",
+                self.target_ip,
+                self.port,
+                self.universe,
+            )
+            return
+
         packet = self.construct_artnet_packet(dmx_data)
 
         # Send using asyncio's loop to avoid blocking
@@ -138,6 +147,20 @@ class ArtNetDMXHelper:
             )
         except OSError as err:
             LOGGER.error("Failed to send Art-Net packet: %s", err)
+
+    async def async_send_current_state(self) -> None:
+        """Send the current DMX buffer to the Art-Net target."""
+        await self.send_dmx_data(self._dmx_data)
+
+    def get_channel_value(self, channel: int) -> int:
+        """Return the current buffered DMX value for one channel."""
+        if not DMX_MIN_CHANNEL <= channel <= DMX_CHANNELS:
+            msg = (
+                f"Channel must be between {DMX_MIN_CHANNEL} and "
+                f"{DMX_CHANNELS}, got {channel}"
+            )
+            raise ValueError(msg)
+        return int(self._dmx_data[channel - 1])
 
     async def set_channel(self, channel: int, value: int) -> None:
         """

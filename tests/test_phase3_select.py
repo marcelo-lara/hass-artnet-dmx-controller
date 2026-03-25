@@ -17,6 +17,12 @@ def test_select_entity_value_map_and_send():
 
     helper = SimpleNamespace()
     helper.set_channel = set_channel
+    helper._dmx_data = bytearray(512)
+
+    def get_channel_value(channel):
+        return helper._dmx_data[channel - 1]
+
+    helper.get_channel_value = get_channel_value
 
     entry_id = "select-test-entry"
     domain = "artnet_dmx_controller"
@@ -46,7 +52,14 @@ def test_select_entity_value_map_and_send():
     sel_mod.load_fixture_mapping = lambda: mapping
 
     try:
-        entry = SimpleNamespace(entry_id=entry_id, data={"fixture_type": "vm", "start_channel": 20, "channel_count": 1})
+        entry = SimpleNamespace(
+            entry_id=entry_id,
+            data={
+                "fixtures": [
+                    {"id": "fixture-vm", "fixture_type": "vm", "start_channel": 20, "channel_count": 1}
+                ]
+            },
+        )
 
         added = []
 
@@ -66,7 +79,27 @@ def test_select_entity_value_map_and_send():
 
     # options should match mapping labels
     assert set(sel.options) == {"White", "Red", "Blue"}
+    assert sel.current_option == "White"
 
     # select an option and verify helper recorded the numeric value
     asyncio.run(sel.async_select_option("Red"))
     assert sent == [(20, 10)]
+
+
+def test_select_entity_uses_explicit_fallback_for_zero_when_unmapped():
+    helper = SimpleNamespace()
+    helper._dmx_data = bytearray(512)
+    helper.get_channel_value = lambda channel: helper._dmx_data[channel - 1]
+
+    entity = select_mod.ArtNetDMXSelect(
+        artnet_helper=helper,
+        dmx_writer=None,
+        channel=5,
+        entry_id="entry-id",
+        fixture_id="fixture-id",
+        channel_name="gobo",
+        value_map={"10": "Open", "20": "Pattern 1"},
+    )
+
+    assert entity.current_option == "Value 0"
+    assert "Value 0" in entity.options

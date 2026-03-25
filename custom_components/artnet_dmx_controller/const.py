@@ -10,6 +10,12 @@ DEFAULT_PORT = 6454
 # Config flow constants
 CONF_TARGET_IP = "target_ip"
 CONF_UNIVERSE = "universe"
+CONF_FIXTURES = "fixtures"
+CONF_FIXTURE_ID = "id"
+CONF_FIXTURE_TYPE = "fixture_type"
+CONF_START_CHANNEL = "start_channel"
+CONF_CHANNEL_COUNT = "channel_count"
+CONF_NAME = "name"
 
 # Default values
 DEFAULT_UNIVERSE = 0

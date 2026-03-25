@@ -106,25 +106,23 @@ hass/bin/python -m pytest -q
 4. Enter the configuration:
    - **Target IP Address**: The IP address of your Art-Net device
    - **Universe**: The Art-Net universe number (0-32767)
+   - **Node Name**: Optional Home Assistant display name for this DMX node
+5. Open the integration options to add one or more fixtures to that node/universe.
 
 ## Usage
 
-After configuration, the integration will create 10 light entities (DMX channels 1-10) that you can control through Home Assistant:
-
-- **Turn On/Off**: Control individual DMX channels
-- **Brightness**: Set DMX values from 0-255
-
-Example entity names:
-- `light.dmx_channel_1`
-- `light.dmx_channel_2`
-- etc.
+Each config entry represents one Art-Net target IP plus one universe. Fixtures attached to that entry share the same DMX buffer and appear as entities under the same Home Assistant device.
 
 ## Fixture Mapping & Config Flow
 
 - This integration uses a shared `fixture_mapping.json` as the single source of truth for fixture models and channel definitions. Fixture models include channel offsets, channel counts, and optional `value_map` entries for selector-type channels.
-- When adding a new fixture via the UI (no YAML required), the config flow will prompt for a `fixture_type` (model) and a `start_channel`. The integration will create a device and child entities derived from the selected model.
+- The initial config flow creates a node/universe entry only.
+- Add fixtures afterwards from the integration options by choosing a `fixture_type` (model) and a `start_channel`.
+- Edit existing fixtures from the same integration options flow by selecting the fixture first, then updating its model, start channel, or display name.
+- Remove fixtures from the integration options flow when they are no longer attached to that node/universe.
+- Channel overlap is validated within that node/universe so fixtures cannot claim the same DMX addresses.
 
-Note: Entities created for a fixture depend on the chosen `fixture_type` and `start_channel`. Names and numbers may therefore vary by model.
+Note: Entities created for a fixture depend on the chosen `fixture_type` and `start_channel`. Names and numbers may therefore vary by model. DMX channels default to `0` on startup, and select entities derive an explicit initial option from that value when possible so Home Assistant does not render them as `unknown`.
 
 ## Scenes (Record / Play)
 
