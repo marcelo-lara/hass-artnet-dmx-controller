@@ -3,7 +3,7 @@ colorlog==6.10.1
 homeassistant>=2026.3.4
 pip>=21.3.1
 ruff==0.15.7
-pytest==9.0.2
+pytest==9.0.3
 # Pin cryptography and ACME-related packages to avoid pyOpenSSL deprecation noise
 cryptography>=40.0.0
 acme>=2.0.0
