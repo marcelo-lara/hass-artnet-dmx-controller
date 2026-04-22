@@ -5,7 +5,7 @@ pip>=21.3.1
 ruff==0.15.7
 pytest==9.0.2
 # Pin cryptography and ACME-related packages to avoid pyOpenSSL deprecation noise
-cryptography>=40.0.0
+cryptography>=46.0.7
 acme>=2.0.0
 # `hass-nabucasa` depends on josepy>=2,<3; allow that range instead of pinning
 josepy>=2,<3
